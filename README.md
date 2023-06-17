@@ -1,4 +1,4 @@
-# Lemmy Account Instance Mover
+# Lemmy Account Settings Instance Migrator
 
 
 TODO: APIs to use to get data:
