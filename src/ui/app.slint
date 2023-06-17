@@ -1,23 +1,35 @@
 import { TabWidget, VerticalBox } from "std-widgets.slint";
-import { ControlPage } from "control_page.slint";
+import { ControlPage, ControlPageHandler } from "control_page.slint";
+export { ControlPageHandler }
 
 export component App inherits Window {
+    out property <string> download_instance_url: download_page.instance_url;
+    out property <string> download_username_input: download_page.username_input;
+    out property <string> download_password_input: download_page.password_input;
+    in property <string> download_log_output <=> download_page.log_output;
+
+    out property <string> upload_instance_url: upload_page.instance_url;
+    out property <string> upload_username_input: upload_page.username_input;
+    out property <string> upload_password_input: upload_page.password_input;
+    in property <string> upload_log_output <=> upload_page.log_output;
+
     title: "Lemmy Account Instance Mover";
+    width: 280px;
+    height: 330px;
 
     VerticalBox {
         alignment: start;
         TabWidget {
             Tab {
                 title: "Download";
-
-                ControlPage {
+                download_page:= ControlPage {
                     type: "Download";
                 }
             }
             Tab {
                 title: "Upload";
 
-                ControlPage {
+                upload_page:= ControlPage {
                     type: "Upload";
                 }
             }

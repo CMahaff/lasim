@@ -1,6 +1,10 @@
 import { Button, VerticalBox, HorizontalBox,
  TabWidget, LineEdit, ScrollView} from "std-widgets.slint";
 
+export global ControlPageHandler {
+    callback clicked(string);
+}
+
 export component ControlPage inherits VerticalBox {
     in-out property <string> type;
     out property <string> instance_url;
@@ -34,6 +38,9 @@ export component ControlPage inherits VerticalBox {
                     text: type;
                     width: 120px;
                     enabled: true;
+                    clicked => {
+                        ControlPageHandler.clicked(type)
+                    }
                 }
             }
             ScrollView {
