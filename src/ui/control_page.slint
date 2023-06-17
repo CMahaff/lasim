@@ -7,22 +7,22 @@ export global ControlPageHandler {
 
 export component ControlPage inherits VerticalBox {
     in-out property <string> type;
-    out property <string> instance_url;
-    out property <string> username_input;
-    out property <string> password_input;
+    out property <string> instance_url: instance_url_object.text;
+    out property <string> username_input: username_input_object.text;
+    out property <string> password_input: password_input_object.text;
     in property <string> log_output;
 
     alignment: start;
 
-    LineEdit {
+    instance_url_object := LineEdit {
         placeholder-text: "Instance URL";
         width: 250px;
     }
-    LineEdit {
+    username_input_object := LineEdit {
         placeholder-text: "Username/Email";
         width: 250px;
     }
-    LineEdit {
+    password_input_object := LineEdit {
         placeholder-text: "Password";
         input-type: password;
         width: 250px;
