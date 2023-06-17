@@ -9,6 +9,8 @@ build = "build.rs"
 
 [dependencies]
 slint = "1.0.2"
+lemmy_api_common = "0.17.4"
+reqwest = "0.11.18"
 
 [build-dependencies]
 slint-build = "1.0.2"
