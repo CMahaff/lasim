@@ -1,0 +1,56 @@
+import { Button, VerticalBox, HorizontalBox,
+ TabWidget, LineEdit, ScrollView} from "std-widgets.slint";
+
+export component ControlPage inherits VerticalBox {
+    in-out property <string> type;
+    out property <string> instance_url;
+    out property <string> username_input;
+    out property <string> password_input;
+    in property <string> log_output;
+
+    alignment: start;
+
+    LineEdit {
+        placeholder-text: "Instance URL";
+        width: 250px;
+    }
+    LineEdit {
+        placeholder-text: "Username/Email";
+        width: 250px;
+    }
+    LineEdit {
+        placeholder-text: "Password";
+        input-type: password;
+        width: 250px;
+    }
+
+    HorizontalLayout {
+        alignment: start;
+        VerticalLayout {
+        width: 250px;
+            HorizontalBox {
+                alignment: center;
+                Button {
+                    text: type;
+                    width: 120px;
+                    enabled: true;
+                }
+            }
+            ScrollView {
+                width: 250px;
+                height: 100px;
+                viewport-height: 2000px;
+                viewport-width: 200px;
+                Text {
+                    wrap: word-wrap;
+                    width: 250px;
+                    x: 0;
+                    y:0;
+                    vertical-alignment: top;
+                    horizontal-alignment: left;
+                    text: log_output;
+                }
+            }
+        }
+    }
+}

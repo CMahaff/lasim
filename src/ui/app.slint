@@ -1,0 +1,26 @@
+import { TabWidget, VerticalBox } from "std-widgets.slint";
+import { ControlPage } from "control_page.slint";
+
+export component App inherits Window {
+    title: "Lemmy Account Instance Mover";
+
+    VerticalBox {
+        alignment: start;
+        TabWidget {
+            Tab {
+                title: "Download";
+
+                ControlPage {
+                    type: "Download";
+                }
+            }
+            Tab {
+                title: "Upload";
+
+                ControlPage {
+                    type: "Upload";
+                }
+            }
+        }
+    }
+}

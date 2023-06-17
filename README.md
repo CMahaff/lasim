@@ -1,1 +1,1 @@
-# LAIM
+# Lemmy Account Instance Mover
