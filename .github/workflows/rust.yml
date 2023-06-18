@@ -15,22 +15,38 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: Run tests
       run: cargo test --verbose
+    - name: Upload Binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: lasim_ubuntu
+        path: target/release/lasim
+        
   build_windows:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: Run tests
       run: cargo test --verbose
+    - name: Upload Binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: lasim_windows
+        path: target/release/lasim
   build_mac:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --release
     - name: Run tests
       run: cargo test --verbose
+    - name: Upload Binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: lasim_macos
+        path: target/release/lasim
