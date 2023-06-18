@@ -11,21 +11,25 @@ export component ControlPage inherits VerticalBox {
     out property <string> username_input: username_input_object.text;
     out property <string> password_input: password_input_object.text;
     in property <string> log_output;
+    in property <bool> ui_enabled: true;
 
     alignment: start;
 
     instance_url_object := LineEdit {
         placeholder-text: "Instance URL";
         width: 250px;
+        enabled: ui_enabled;
     }
     username_input_object := LineEdit {
         placeholder-text: "Username/Email";
         width: 250px;
+        enabled: ui_enabled;
     }
     password_input_object := LineEdit {
         placeholder-text: "Password";
         input-type: password;
         width: 250px;
+        enabled: ui_enabled;
     }
 
     HorizontalLayout {
@@ -37,7 +41,7 @@ export component ControlPage inherits VerticalBox {
                 Button {
                     text: type;
                     width: 120px;
-                    enabled: true;
+                    enabled: ui_enabled;
                     clicked => {
                         ControlPageHandler.clicked(type)
                     }

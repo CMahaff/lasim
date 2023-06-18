@@ -29,9 +29,15 @@ impl API {
             .json(&params)
             .send()
             .await?;
-    
-        let json = response.json::<person::LoginResponse>().await.unwrap();
-    
-        return Ok(json.jwt.unwrap().to_string());
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json = response.json::<person::LoginResponse>().await.unwrap();
+                return Ok(json.jwt.unwrap().to_string());
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
     }
 }
