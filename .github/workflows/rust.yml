@@ -36,7 +36,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: lasim_windows
-        path: target/release/lasim
+        path: target/release/lasim.exe
   build_mac:
     runs-on: macos-latest
     steps:
