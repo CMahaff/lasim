@@ -1,5 +1,5 @@
 import { Button, VerticalBox, HorizontalBox,
- TabWidget, LineEdit, ScrollView} from "std-widgets.slint";
+ TabWidget, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
 
 export global ControlPageHandler {
     callback clicked(string);
@@ -52,12 +52,12 @@ export component ControlPage inherits VerticalBox {
                 height: 100px;
                 viewport-height: 2000px;
                 viewport-width: 200px;
-                Text {
+                TextEdit {
                     wrap: word-wrap;
+                    read-only: true;
                     width: 250px;
                     x: 0;
                     y:0;
-                    vertical-alignment: top;
                     horizontal-alignment: left;
                     text: log_output;
                 }
