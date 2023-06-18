@@ -6,6 +6,9 @@ use slint::SharedString;
 use std::thread;
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
+use std::path::Path;
+use std::fs::File;
+use std::io::prelude::*;
 use futures::executor::block_on;
 
 slint::include_modules!();
@@ -19,16 +22,17 @@ struct ProcessingInstruction {
 
 #[tokio::main]
 async fn process_download(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
-    let instance = processing_instruction.instance;
-    let username = processing_instruction.username;
-    let password = processing_instruction.password;
+    let instance = processing_instruction.instance.to_string();
+    let username = processing_instruction.username.to_string();
+    let password = processing_instruction.password.to_string();
     logger(format!("Logging in as {}", username));
 
     let api = lemmy::API::new();
 
-    let jwt_token_future = api.login(instance.to_string(), username.to_string(), password.to_string());
-    let jwt_token_result = block_on(jwt_token_future);
+    // Login
 
+    let jwt_token_future = api.login(&instance, &username, &password);
+    let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
         return;
@@ -36,6 +40,38 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 
     let jwt_token = jwt_token_result.unwrap();
     logger("Login Successful.".to_string());
+
+    // Fetch Profile
+
+    let profile_settings_future = api.fetch_profile_settings(&instance, &jwt_token);
+    let profile_settings_result = block_on(profile_settings_future);
+    if profile_settings_result.is_err() {
+        logger(format!("ERROR: Failed to fetch Porfile - {}", profile_settings_result.unwrap_err()));
+        return;
+    }
+    let profile_settings = profile_settings_result.unwrap();
+    logger("Profile retrieved!".to_string());
+
+    // Write to File
+
+    let path = Path::new("profile_settings.json");
+    let mut file = match File::create(&path) {
+        Ok(file) => file,
+        Err(e) => {
+            logger(format!("ERROR: Cannot write file - {}: {}", path.display(), e));
+            return
+        }
+    };
+
+    let json_string = serde_json::to_string(&profile_settings);
+    match file.write_all(format!("{}", json_string.unwrap()).as_bytes()) {
+        Ok(_) => {
+            logger(format!("Wrote Profile to {}", path.to_str().unwrap()))
+        },
+        Err(e) => {
+            logger(format!("ERROR: Cannot write file - {}: {}", path.display(), e));
+        }
+    }
 }
 
 #[tokio::main]
