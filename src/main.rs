@@ -63,7 +63,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
         }
     };
 
-    let json_string = serde_json::to_string(&profile_settings);
+    let json_string = serde_json::to_string_pretty(&profile_settings);
     match file.write_all(format!("{}", json_string.unwrap()).as_bytes()) {
         Ok(_) => {
             logger(format!("Wrote Profile to {}", path.to_str().unwrap()))
