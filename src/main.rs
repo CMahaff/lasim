@@ -1,5 +1,7 @@
 mod lemmy;
+mod profile;
 
+use lemmy_api_common::site;
 use slint::Weak;
 use slint::SharedString;
 
@@ -13,6 +15,8 @@ use futures::executor::block_on;
 
 slint::include_modules!();
 
+const PROFILE_FILENAME: &str = "profile_settings.json";
+
 struct ProcessingInstruction {
     instruction_type: SharedString,
     instance: SharedString,
@@ -20,41 +24,8 @@ struct ProcessingInstruction {
     password: SharedString,
 }
 
-#[tokio::main]
-async fn process_download(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
-    let instance = processing_instruction.instance.to_string();
-    let username = processing_instruction.username.to_string();
-    let password = processing_instruction.password.to_string();
-    logger(format!("Logging in as {}", username));
-
-    let api = lemmy::API::new();
-
-    // Login
-
-    let jwt_token_future = api.login(&instance, &username, &password);
-    let jwt_token_result = block_on(jwt_token_future);
-    if jwt_token_result.is_err() {
-        logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
-        return;
-    }
-
-    let jwt_token = jwt_token_result.unwrap();
-    logger("Login Successful.".to_string());
-
-    // Fetch Profile
-
-    let profile_settings_future = api.fetch_profile_settings(&instance, &jwt_token);
-    let profile_settings_result = block_on(profile_settings_future);
-    if profile_settings_result.is_err() {
-        logger(format!("ERROR: Failed to fetch Porfile - {}", profile_settings_result.unwrap_err()));
-        return;
-    }
-    let profile_settings = profile_settings_result.unwrap();
-    logger("Profile retrieved!".to_string());
-
-    // Write to File
-
-    let path = Path::new("profile_settings.json");
+fn write_profile(profile_settings: &site::GetSiteResponse, mut logger: impl FnMut(String)) {
+    let path = Path::new(PROFILE_FILENAME);
     let mut file = match File::create(&path) {
         Ok(file) => file,
         Err(e) => {
@@ -75,8 +46,112 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 }
 
 #[tokio::main]
-async fn process_upload(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
+async fn process_download(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
+    // Fetch data from UI
+    let instance = processing_instruction.instance.to_string();
+    let username = processing_instruction.username.to_string();
+    let password = processing_instruction.password.to_string();
+    logger(format!("Logging in as {}", username));
 
+    let api = lemmy::API::new();
+
+    // Login
+    let jwt_token_future = api.login(&instance, &username, &password);
+    let jwt_token_result = block_on(jwt_token_future);
+    if jwt_token_result.is_err() {
+        logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
+        return;
+    }
+
+    let jwt_token = jwt_token_result.unwrap();
+    logger("Login Successful.".to_string());
+
+    // Fetch Profile
+    let profile_settings_future = api.fetch_profile_settings(&instance, &jwt_token);
+    let profile_settings_result = block_on(profile_settings_future);
+    if profile_settings_result.is_err() {
+        logger(format!("ERROR: Failed to fetch Porfile - {}", profile_settings_result.unwrap_err()));
+        return;
+    }
+    let profile_settings = profile_settings_result.unwrap();
+    logger("Profile retrieved!".to_string());
+
+    // Write to File
+    write_profile(&profile_settings, logger);
+    
+}
+
+fn read_profile() -> Result<site::GetSiteResponse, String> {
+    let path = Path::new(PROFILE_FILENAME);
+    let profile_json_result = std::fs::read_to_string(path);
+    let profile_json = match profile_json_result {
+        Ok(file) => file,
+        Err(_) => return Err("ERROR: Failed to open profile settings!".to_string()),
+    };
+
+    let profile_settings_result: Result<site::GetSiteResponse, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
+    let profile_settings = match profile_settings_result {
+        Ok(profile) => profile,
+        Err(e) => return Err(format!("ERROR: Failed to parse profile JSON - {}", e)),
+    };
+
+    return Ok(profile_settings);
+}
+
+#[tokio::main]
+async fn process_upload(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
+    // Read original profile
+    let original_profile = match read_profile() {
+        Ok(profile) => profile,
+        Err(e) => {
+            logger(format!("{}", e).to_string());
+            return;
+        },
+    };
+
+    // Fetch data from UI
+    let instance = processing_instruction.instance.to_string();
+    let username = processing_instruction.username.to_string();
+    let password = processing_instruction.password.to_string();
+    logger(format!("Logging in as {}", username));
+
+    let api = lemmy::API::new();
+
+    // Login
+    let jwt_token_future = api.login(&instance, &username, &password);
+    let jwt_token_result = block_on(jwt_token_future);
+    if jwt_token_result.is_err() {
+        logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
+        return;
+    }
+
+    let jwt_token = jwt_token_result.unwrap();
+    logger("Login Successful.".to_string());
+
+    // Fetch New Profile
+    let new_profile_future = api.fetch_profile_settings(&instance, &jwt_token);
+    let new_profile_result = block_on(new_profile_future);
+    if new_profile_result.is_err() {
+        logger(format!("ERROR: Failed to fetch Porfile - {}", new_profile_result.unwrap_err()));
+        return;
+    }
+    let new_profile = new_profile_result.unwrap();
+    logger("Existing Settings Downloaded. Calculating delta...".to_string());
+
+    // Calculating Differences
+    let profile_changes = profile::calculate_changes(&original_profile, &new_profile);
+    logger("All profile settings from the original profile will be applied.".to_string());
+    logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
+    logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
+    logger(format!("{} new communities will be blocked", profile_changes.communities_to_follow.len()));
+
+    // TODO: Call API to block users
+
+    // TODO: Call API to block communities
+
+    // TODO: Call API to follow communities
+
+    // TODO: Call API to apply settings
 }
 
 fn main() {
