@@ -32,8 +32,11 @@ impl API {
 
         match response.error_for_status() {
             Ok(response) => {
-                let json = response.json::<person::LoginResponse>().await.unwrap();
-                return Ok(json.jwt.unwrap().to_string());
+                let json_result = response.json::<person::LoginResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json.jwt.unwrap().to_string()),
+                    Err(e) => return Err(e),
+                }
             },
             Err(e) => {
                 return Err(e);
@@ -54,8 +57,11 @@ impl API {
 
         match response.error_for_status() {
             Ok(response) => {
-                let json = response.json::<site::GetSiteResponse>().await.unwrap();
-                return Ok(json);
+                let json_result = response.json::<site::GetSiteResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
             },
             Err(e) => {
                 return Err(e);

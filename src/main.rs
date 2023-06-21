@@ -70,7 +70,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     let profile_settings_future = api.fetch_profile_settings(&instance, &jwt_token);
     let profile_settings_result = block_on(profile_settings_future);
     if profile_settings_result.is_err() {
-        logger(format!("ERROR: Failed to fetch Porfile - {}", profile_settings_result.unwrap_err()));
+        logger(format!("ERROR: Failed to fetch Profile - {}", profile_settings_result.unwrap_err()));
         return;
     }
     let profile_settings = profile_settings_result.unwrap();
@@ -143,14 +143,25 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     logger("All profile settings from the original profile will be applied.".to_string());
     logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
     logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
-    logger(format!("{} new communities will be blocked", profile_changes.communities_to_follow.len()));
+    logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
 
-    // TODO: Call API to block users
+    // Call API to actually apply changes to new account
 
-    // TODO: Call API to block communities
-
-    // TODO: Call API to follow communities
-
+    for blocked_user_string in profile_changes.users_to_block {
+        // TODO: Call API to fetch user (to get ID)
+        // TODO: Call API to block user
+    }
+    
+    for blocked_community_string in profile_changes.communities_to_block {
+        // TODO: Call API to fetch community (to get ID)
+        // TODO: Call API to block communities
+    }
+    
+    for follow_community_string in profile_changes.communities_to_follow {
+        // TODO: Call API to fetch community (to get ID)
+        // TODO: Call API to follow communities
+    }
+    
     // TODO: Call API to apply settings
 }
 

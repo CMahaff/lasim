@@ -1,25 +1,95 @@
 use lemmy_api_common::sensitive::Sensitive;
 use lemmy_api_common::site;
 use lemmy_api_common::person;
-use lemmy_api_common::lemmy_db_schema::newtypes;
-
 pub struct ProfileConfigurationChanges {
-    pub users_to_block: Vec<newtypes::PersonId>,
-    pub communities_to_block: Vec<newtypes::CommunityId>,
-    pub communities_to_follow: Vec<newtypes::CommunityId>,
+    pub users_to_block: Vec<String>,
+    pub communities_to_block: Vec<String>,
+    pub communities_to_follow: Vec<String>,
     pub new_settings: person::SaveUserSettings,
 }
 
-fn calculate_users_to_block(original_profile: &site::GetSiteResponse, new_profile: &site::GetSiteResponse) -> Vec<newtypes::PersonId> {
-    return Vec::new();
+fn parse_url(actor_id: String) -> String {
+    let removed_begin = actor_id.strip_prefix("https://").unwrap_or(&actor_id);
+    let split_url: Vec<&str> = removed_begin.split("/").collect();
+    return format!("{}@{}", split_url.get(2).unwrap(), split_url.get(0).unwrap());
 }
 
-fn calculate_communities_to_block(original_profile: &site::GetSiteResponse, new_profile: &site::GetSiteResponse) -> Vec<newtypes::CommunityId> {
-    return Vec::new();
+fn calculate_users_to_block(original_profile: &site::GetSiteResponse, new_profile: &site::GetSiteResponse) -> Vec<String> {
+    let original_blocks = &(original_profile.my_user.as_ref().unwrap().person_blocks);
+    let new_blocks = &(new_profile.my_user.as_ref().unwrap().person_blocks);
+    let mut new_block_requests: Vec<String> = vec![];
+
+    for orig_block_view in original_blocks {
+        let orig_block_user = parse_url(orig_block_view.target.actor_id.to_string());
+
+        let mut already_blocked = false;
+        for new_block_view in new_blocks {
+            let new_block_user = parse_url(new_block_view.target.actor_id.to_string());
+            
+            if orig_block_user == new_block_user {
+                already_blocked = true;
+                break;
+            }
+        }
+
+        if !already_blocked {
+            new_block_requests.push(orig_block_user);
+        }
+    }
+
+    return new_block_requests;
 }
 
-fn calculate_communities_to_follow(original_profile: &site::GetSiteResponse, new_profile: &site::GetSiteResponse) -> Vec<newtypes::CommunityId> {
-    return Vec::new();
+fn calculate_communities_to_block(original_profile: &site::GetSiteResponse, new_profile: &site::GetSiteResponse) -> Vec<String> {
+    let original_blocks = &(original_profile.my_user.as_ref().unwrap().community_blocks);
+    let new_blocks = &(new_profile.my_user.as_ref().unwrap().community_blocks);
+    let mut new_block_requests: Vec<String> = vec![];
+
+    for orig_block_view in original_blocks {
+        let orig_block_comm = parse_url(orig_block_view.community.actor_id.to_string());
+
+        let mut already_blocked = false;
+        for new_block_view in new_blocks {
+            let new_block_comm = parse_url(new_block_view.community.actor_id.to_string());
+            
+            if orig_block_comm == new_block_comm {
+                already_blocked = true;
+                break;
+            }
+        }
+
+        if !already_blocked {
+            new_block_requests.push(orig_block_comm);
+        }
+    }
+
+    return new_block_requests;
+}
+
+fn calculate_communities_to_follow(original_profile: &site::GetSiteResponse, new_profile: &site::GetSiteResponse) -> Vec<String> {
+    let original_follows= &(original_profile.my_user.as_ref().unwrap().follows);
+    let new_follows = &(new_profile.my_user.as_ref().unwrap().follows);
+    let mut new_follow_requests: Vec<String> = vec![];
+
+    for orig_follow_view in original_follows {
+        let orig_follow_comm = parse_url(orig_follow_view.community.actor_id.to_string());
+
+        let mut already_followed = false;
+        for new_follow_view in new_follows {
+            let new_follow_comm = parse_url(new_follow_view.community.actor_id.to_string());
+            
+            if orig_follow_comm == new_follow_comm {
+                already_followed = true;
+                break;
+            }
+        }
+
+        if !already_followed {
+            new_follow_requests.push(orig_follow_comm);
+        }
+    }
+
+    return new_follow_requests;
 }
 
 fn construct_settings(original_profile: &site::GetSiteResponse) -> person::SaveUserSettings {

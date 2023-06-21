@@ -14,4 +14,4 @@ Cargo.lock
 *.pdb
 
 # Generated when running application
-profile_settings.json
+profile*.json
