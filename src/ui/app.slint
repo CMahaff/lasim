@@ -1,4 +1,4 @@
-import { TabWidget, VerticalBox } from "std-widgets.slint";
+import { TabWidget, VerticalBox, TextEdit } from "std-widgets.slint";
 import { ControlPage, ControlPageHandler } from "control_page.slint";
 export { ControlPageHandler }
 
@@ -33,6 +33,29 @@ export component App inherits Window {
 
                 upload_page := ControlPage {
                     type: "Upload";
+                }
+            }
+            Tab {
+                title: "About";
+
+                VerticalBox {
+                    width: 250px;
+                    alignment: start;
+
+                    Text {
+                        font-size: 20px;
+                        font-weight: 900;
+                        text: "LASIM 0.1.0";
+                    }
+                    Text {
+                        text: "Lemmy API Version 0.17.4";
+                    }
+                    Text {
+                        text: "Created by Connor Mahaffey";
+                    }
+                    Text {
+                        text: "https://github.com/CMahaff/lasim";
+                    }
                 }
             }
         }

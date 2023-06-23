@@ -1,6 +1,8 @@
 use lemmy_api_common::sensitive::Sensitive;
 use lemmy_api_common::person;
 use lemmy_api_common::site;
+use lemmy_api_common::community;
+use lemmy_api_common::lemmy_db_schema::newtypes;
 use reqwest::Client;
 use reqwest::Response;
 use reqwest::Error;
@@ -58,6 +60,184 @@ impl API {
         match response.error_for_status() {
             Ok(response) => {
                 let json_result = response.json::<site::GetSiteResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn fetch_community_by_name(&self, instance: &String, jwt_token: &String, name: &String) -> 
+        Result<community::GetCommunityResponse, Error> {
+
+        let params = community::GetCommunity {
+            name: Some(name.clone()),
+            auth: Some(Sensitive::new(jwt_token.clone())),
+            ..Default::default()
+        };
+    
+        let response: Response = self.client
+            .get(instance.clone() + "/api/v3/community")
+            .query(&params)
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json_result = response.json::<community::GetCommunityResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn block_community(&self,
+        instance: &String,
+        jwt_token: &String,
+        community_id: newtypes::CommunityId) -> Result<community::BlockCommunityResponse, Error> {
+
+        let params = community::BlockCommunity {
+            community_id,
+            block: true,
+            auth: Sensitive::new(jwt_token.clone()),
+        };
+    
+        let response: Response = self.client
+            .post(instance.clone() + "/api/v3/community/block")
+            .json(&params)
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json_result = response.json::<community::BlockCommunityResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn follow_community(&self,
+        instance: &String,
+        jwt_token: &String,
+        community_id: newtypes::CommunityId) -> Result<community::CommunityResponse, Error> {
+
+        let params = community::FollowCommunity {
+            community_id,
+            follow: true,
+            auth: Sensitive::new(jwt_token.clone()),
+        };
+    
+        let response: Response = self.client
+            .post(instance.clone() + "/api/v3/community/follow")
+            .json(&params)
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json_result = response.json::<community::CommunityResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn fetch_user_details(&self, instance: &String, jwt_token: &String, name: &String) -> 
+        Result<person::GetPersonDetailsResponse, Error> {
+
+        let params = person::GetPersonDetails {
+            username: Some(name.clone()),
+            auth: Some(Sensitive::new(jwt_token.clone())),
+            ..Default::default()
+        };
+    
+        let response: Response = self.client
+            .get(instance.clone() + "/api/v3/user")
+            .query(&params)
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json_result = response.json::<person::GetPersonDetailsResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn block_user(&self,
+        instance: &String,
+        jwt_token: &String,
+        person_id: newtypes::PersonId) -> Result<person::BlockPersonResponse, Error> {
+
+        let params = person::BlockPerson {
+            person_id,
+            block: true,
+            auth: Sensitive::new(jwt_token.clone()),
+        };
+    
+        let response: Response = self.client
+            .post(instance.clone() + "/api/v3/user/block")
+            .json(&params)
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json_result = response.json::<person::BlockPersonResponse>().await;
+                match json_result {
+                    Ok(json) => return Ok(json),
+                    Err(e) => return Err(e),
+                }
+            },
+            Err(e) => {
+                return Err(e);
+            }
+        }
+    }
+
+    pub async fn save_user_settings(&self,
+        instance: &String,
+        jwt_token: &String,
+        mut user_settings: person::SaveUserSettings) -> Result<person::LoginResponse, Error> {
+
+        user_settings.auth = Sensitive::new(jwt_token.clone());
+    
+        let response: Response = self.client
+            .post(instance.clone() + "/api/v3/user/save_user_settings")
+            .json(&user_settings)
+            .send()
+            .await?;
+
+        match response.error_for_status() {
+            Ok(response) => {
+                let json_result = response.json::<person::LoginResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
                     Err(e) => return Err(e),
