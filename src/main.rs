@@ -3,6 +3,7 @@ mod profile;
 
 use slint::Weak;
 use slint::SharedString;
+use url::Url;
 
 use std::thread;
 use std::sync::mpsc;
@@ -48,15 +49,25 @@ fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl
 #[tokio::main]
 async fn process_download(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
     // Fetch data from UI
-    let instance = processing_instruction.instance.to_string();
+    let mut instance = processing_instruction.instance.to_string();
     let username = processing_instruction.username.to_string();
     let password = processing_instruction.password.to_string();
-    logger(format!("Logging in as {}", username));
 
-    let api = lemmy::api::API::new();
+    if !instance.starts_with("http") {
+        instance.insert_str(0, "https://");
+    }
+    let instance_url_result = Url::parse(instance.as_str());
+    if instance_url_result.is_err() {
+        logger("ERROR: Invalid Instance URL".to_string());
+        return;
+    }
+    let instance_url = instance_url_result.unwrap();
+
+    let api = lemmy::api::API::new(instance_url);
 
     // Login
-    let jwt_token_future = api.login(&instance, &username, &password);
+    logger(format!("Logging in as {}", username));
+    let jwt_token_future = api.login(&username, &password);
     let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
@@ -67,7 +78,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     logger("Login Successful.".to_string());
 
     // Fetch Profile
-    let profile_settings_future = api.fetch_profile_settings(&instance, &jwt_token);
+    let profile_settings_future = api.fetch_profile_settings(&jwt_token);
     let profile_settings_result = block_on(profile_settings_future);
     if profile_settings_result.is_err() {
         logger(format!("ERROR: Failed to fetch Profile - {}", profile_settings_result.unwrap_err()));
@@ -113,15 +124,25 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     };
 
     // Fetch data from UI
-    let instance = processing_instruction.instance.to_string();
+    let mut instance = processing_instruction.instance.to_string();
     let username = processing_instruction.username.to_string();
     let password = processing_instruction.password.to_string();
-    logger(format!("Logging in as {}", username));
 
-    let api = lemmy::api::API::new();
+    if !instance.starts_with("http") {
+        instance.insert_str(0, "https://");
+    }
+    let instance_url_result = Url::parse(instance.as_str());
+    if instance_url_result.is_err() {
+        logger("ERROR: Invalid Instance URL".to_string());
+        return;
+    }
+    let instance_url = instance_url_result.unwrap();
+
+    let api = lemmy::api::API::new(instance_url);
 
     // Login
-    let jwt_token_future = api.login(&instance, &username, &password);
+    logger(format!("Logging in as {}", username));
+    let jwt_token_future = api.login(&username, &password);
     let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
@@ -132,7 +153,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     logger("Login Successful.".to_string());
 
     // Fetch New Profile
-    let new_profile_future = api.fetch_profile_settings(&instance, &jwt_token);
+    let new_profile_future = api.fetch_profile_settings(&jwt_token);
     let new_profile_result = block_on(new_profile_future);
     if new_profile_result.is_err() {
         logger(format!("ERROR: Failed to fetch Porfile - {}", new_profile_result.unwrap_err()));
@@ -159,18 +180,18 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
 
     // Block Users
     for blocked_user_string in profile_changes.blocked_users {
-        let user_details_result = api.fetch_user_details(&instance, &jwt_token, &blocked_user_string).await;
+        let user_details_result = api.fetch_user_details(&jwt_token, &blocked_user_string).await;
         thread::sleep(message_rate_limit);
 
         if user_details_result.is_err() {
-            logger(format!("Cannot find user {} to block, got exception {:?}",
+            logger(format!("Cannot find user {} to block, got exception {}",
                            blocked_user_string,
                            user_details_result.unwrap_err()));
             continue;
         }
 
         let id_to_block = user_details_result.unwrap().person_view.person.id;
-        let block_user_result = api.block_user(&instance, &jwt_token, id_to_block).await;
+        let block_user_result = api.block_user(&jwt_token, id_to_block).await;
         thread::sleep(message_rate_limit);
 
         match block_user_result {
@@ -179,24 +200,24 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
                     format!("Server refused to block user {}", blocked_user_string);
                 }
             }
-            Err(e) => logger(format!("Got exception blocking user {}: {:?}", blocked_user_string, e)),
+            Err(e) => logger(format!("Got exception blocking user {}: {}", blocked_user_string, e)),
         }
     }
     
     // Block Communities
     for blocked_community_string in profile_changes.blocked_communities {
-        let community_details_result = api.fetch_community_by_name(&instance, &jwt_token, &blocked_community_string).await;
+        let community_details_result = api.fetch_community_by_name(&jwt_token, &blocked_community_string).await;
         thread::sleep(message_rate_limit);
 
         if community_details_result.is_err() {
-            logger(format!("Cannot find community {} to block, got exception {:?}",
+            logger(format!("Cannot find community {} to block, got exception {}",
                            blocked_community_string,
                            community_details_result.unwrap_err()));
             continue;
         }
         
         let id_to_block = community_details_result.unwrap().community_view.community.id;
-        let block_community_result = api.block_community(&instance, &jwt_token, id_to_block).await;
+        let block_community_result = api.block_community(&jwt_token, id_to_block).await;
         thread::sleep(message_rate_limit);
 
         match block_community_result {
@@ -205,24 +226,24 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
                     format!("Server refused to block community {}", blocked_community_string);
                 }
             }
-            Err(e) => logger(format!("Got exception blocking community {}: {:?}", blocked_community_string, e)),
+            Err(e) => logger(format!("Got exception blocking community {}: {}", blocked_community_string, e)),
         }
     }
     
     // Follow Communities
     for follow_community_string in profile_changes.followed_communities {
-        let community_details_result = api.fetch_community_by_name(&instance, &jwt_token, &follow_community_string).await;
+        let community_details_result = api.fetch_community_by_name(&jwt_token, &follow_community_string).await;
         thread::sleep(message_rate_limit);
 
         if community_details_result.is_err() {
-            logger(format!("Cannot find community {}, got exception {:?}",
+            logger(format!("Cannot find community {}, got exception {}",
                            follow_community_string,
                            community_details_result.unwrap_err()));
             continue;
         }
 
         let id_to_follow = community_details_result.unwrap().community_view.community.id;
-        let follow_community_result = api.follow_community(&instance, &jwt_token, id_to_follow).await;
+        let follow_community_result = api.follow_community(&jwt_token, id_to_follow).await;
         thread::sleep(message_rate_limit);
 
         match follow_community_result {
@@ -231,14 +252,14 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
                     format!("Server refused to follow community {}", follow_community_string);
                 }
             }
-            Err(e) => logger(format!("Got exception following community {}: {:?}", follow_community_string, e)),
+            Err(e) => logger(format!("Got exception following community {}: {}", follow_community_string, e)),
         }
     }
     
     // Save profile settings
-    let save_settings_result = api.save_user_settings(&instance, &jwt_token, profile_changes.profile_settings).await;
+    let save_settings_result = api.save_user_settings(&jwt_token, profile_changes.profile_settings).await;
     if save_settings_result.is_err() {
-        logger(format!("Cannot save profile settings, got exception {:?}", save_settings_result.unwrap_err()));
+        logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
     }
 
     logger(format!("Finished!"));
