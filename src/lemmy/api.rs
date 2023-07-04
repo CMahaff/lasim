@@ -6,7 +6,7 @@ use lemmy_api_common::lemmy_db_schema::newtypes;
 use reqwest::Client;
 use reqwest::Response;
 use reqwest::Error;
-
+use crate::profile;
 
 pub struct API {
     client: Client,
@@ -225,13 +225,14 @@ impl API {
     pub async fn save_user_settings(&self,
         instance: &String,
         jwt_token: &String,
-        mut user_settings: person::SaveUserSettings) -> Result<person::LoginResponse, Error> {
+        user_settings_local: profile::ProfileSettings) -> Result<person::LoginResponse, Error> {
 
-        user_settings.auth = Sensitive::new(jwt_token.clone());
+        let mut user_settings_api = profile::construct_settings(&user_settings_local);
+        user_settings_api.auth = Sensitive::new(jwt_token.clone());
     
         let response: Response = self.client
             .post(instance.clone() + "/api/v3/user/save_user_settings")
-            .json(&user_settings)
+            .json(&user_settings_api)
             .send()
             .await?;
 

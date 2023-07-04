@@ -9,7 +9,7 @@ build = "build.rs"
 
 [dependencies]
 slint = "1.0.2"
-lemmy_api_common = "0.17.4"
+lemmy_api_common = "0.18.1-rc.9"
 reqwest = { version = "0.11.18", features = ["json"] }
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }

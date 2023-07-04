@@ -1,7 +1,6 @@
 mod lemmy;
 mod profile;
 
-use lemmy_api_common::site;
 use slint::Weak;
 use slint::SharedString;
 
@@ -15,7 +14,8 @@ use futures::executor::block_on;
 
 slint::include_modules!();
 
-const PROFILE_FILENAME: &str = "profile_settings.json";
+// TODO: In the future, if needed, support versioning of this file. For now, hard-code.
+const PROFILE_FILENAME: &str = "profile_v1.json";
 
 struct ProcessingInstruction {
     instruction_type: SharedString,
@@ -24,7 +24,7 @@ struct ProcessingInstruction {
     password: SharedString,
 }
 
-fn write_profile(profile_settings: &site::GetSiteResponse, mut logger: impl FnMut(String)) {
+fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
     let path = Path::new(PROFILE_FILENAME);
     let mut file = match File::create(&path) {
         Ok(file) => file,
@@ -34,7 +34,7 @@ fn write_profile(profile_settings: &site::GetSiteResponse, mut logger: impl FnMu
         }
     };
 
-    let json_string = serde_json::to_string_pretty(&profile_settings);
+    let json_string = serde_json::to_string_pretty(&profile_local);
     match file.write_all(format!("{}", json_string.unwrap()).as_bytes()) {
         Ok(_) => {
             logger(format!("Wrote Profile to: {}", path.to_str().unwrap()))
@@ -53,7 +53,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     let password = processing_instruction.password.to_string();
     logger(format!("Logging in as {}", username));
 
-    let api = lemmy::API::new();
+    let api = lemmy::api::API::new();
 
     // Login
     let jwt_token_future = api.login(&instance, &username, &password);
@@ -76,12 +76,15 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     let profile_settings = profile_settings_result.unwrap();
     logger("Profile retrieved!".to_string());
 
+    // Convert Profile
+    let profile_local = profile::construct_profile(&profile_settings);
+
     // Write to File
-    write_profile(&profile_settings, logger);
+    write_profile(&profile_local, logger);
     
 }
 
-fn read_profile() -> Result<site::GetSiteResponse, String> {
+fn read_profile() -> Result<profile::ProfileConfiguration, String> {
     let path = Path::new(PROFILE_FILENAME);
     let profile_json_result = std::fs::read_to_string(path);
     let profile_json = match profile_json_result {
@@ -89,13 +92,13 @@ fn read_profile() -> Result<site::GetSiteResponse, String> {
         Err(_) => return Err("ERROR: Failed to open profile settings!".to_string()),
     };
 
-    let profile_settings_result: Result<site::GetSiteResponse, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
-    let profile_settings = match profile_settings_result {
+    let profile_local_result: Result<profile::ProfileConfiguration, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
+    let profile_local = match profile_local_result {
         Ok(profile) => profile,
         Err(e) => return Err(format!("ERROR: Failed to parse profile JSON - {}", e)),
     };
 
-    return Ok(profile_settings);
+    return Ok(profile_local);
 }
 
 #[tokio::main]
@@ -115,7 +118,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let password = processing_instruction.password.to_string();
     logger(format!("Logging in as {}", username));
 
-    let api = lemmy::API::new();
+    let api = lemmy::api::API::new();
 
     // Login
     let jwt_token_future = api.login(&instance, &username, &password);
@@ -135,34 +138,110 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
         logger(format!("ERROR: Failed to fetch Porfile - {}", new_profile_result.unwrap_err()));
         return;
     }
-    let new_profile = new_profile_result.unwrap();
+    let new_profile_api = new_profile_result.unwrap();
     logger("Existing Settings Downloaded. Calculating delta...".to_string());
+
+    // Convert
+    let new_profile = profile::construct_profile(&new_profile_api);
 
     // Calculating Differences
     let profile_changes = profile::calculate_changes(&original_profile, &new_profile);
     logger("All profile settings from the original profile will be applied.".to_string());
-    logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
-    logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
-    logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
+    logger(format!("{} new users will be blocked", profile_changes.blocked_users.len()));
+    logger(format!("{} new communities will be blocked", profile_changes.blocked_communities.len()));
+    logger(format!("{} new communities will be followed", profile_changes.followed_communities.len()));
 
     // Call API to actually apply changes to new account
 
-    for blocked_user_string in profile_changes.users_to_block {
-        // TODO: Call API to fetch user (to get ID)
-        // TODO: Call API to block user
+    // Account for Rate Limits - values get mapped as seen here: lemmy/src/api_routes_http.rs
+    let message_per_second = new_profile_api.site_view.local_site_rate_limit.message_per_second;
+    let message_rate_limit = std::time::Duration::from_millis((1000f64 / message_per_second as f64).ceil() as u64);
+
+    // Block Users
+    for blocked_user_string in profile_changes.blocked_users {
+        let user_details_result = api.fetch_user_details(&instance, &jwt_token, &blocked_user_string).await;
+        thread::sleep(message_rate_limit);
+
+        if user_details_result.is_err() {
+            logger(format!("Cannot find user {} to block, got exception {:?}",
+                           blocked_user_string,
+                           user_details_result.unwrap_err()));
+            continue;
+        }
+
+        let id_to_block = user_details_result.unwrap().person_view.person.id;
+        let block_user_result = api.block_user(&instance, &jwt_token, id_to_block).await;
+        thread::sleep(message_rate_limit);
+
+        match block_user_result {
+            Ok(response) => {
+                if !response.blocked {
+                    format!("Server refused to block user {}", blocked_user_string);
+                }
+            }
+            Err(e) => logger(format!("Got exception blocking user {}: {:?}", blocked_user_string, e)),
+        }
     }
     
-    for blocked_community_string in profile_changes.communities_to_block {
-        // TODO: Call API to fetch community (to get ID)
-        // TODO: Call API to block communities
+    // Block Communities
+    for blocked_community_string in profile_changes.blocked_communities {
+        let community_details_result = api.fetch_community_by_name(&instance, &jwt_token, &blocked_community_string).await;
+        thread::sleep(message_rate_limit);
+
+        if community_details_result.is_err() {
+            logger(format!("Cannot find community {} to block, got exception {:?}",
+                           blocked_community_string,
+                           community_details_result.unwrap_err()));
+            continue;
+        }
+        
+        let id_to_block = community_details_result.unwrap().community_view.community.id;
+        let block_community_result = api.block_community(&instance, &jwt_token, id_to_block).await;
+        thread::sleep(message_rate_limit);
+
+        match block_community_result {
+            Ok(response) => {
+                if !response.blocked {
+                    format!("Server refused to block community {}", blocked_community_string);
+                }
+            }
+            Err(e) => logger(format!("Got exception blocking community {}: {:?}", blocked_community_string, e)),
+        }
     }
     
-    for follow_community_string in profile_changes.communities_to_follow {
-        // TODO: Call API to fetch community (to get ID)
-        // TODO: Call API to follow communities
+    // Follow Communities
+    for follow_community_string in profile_changes.followed_communities {
+        let community_details_result = api.fetch_community_by_name(&instance, &jwt_token, &follow_community_string).await;
+        thread::sleep(message_rate_limit);
+
+        if community_details_result.is_err() {
+            logger(format!("Cannot find community {}, got exception {:?}",
+                           follow_community_string,
+                           community_details_result.unwrap_err()));
+            continue;
+        }
+
+        let id_to_follow = community_details_result.unwrap().community_view.community.id;
+        let follow_community_result = api.follow_community(&instance, &jwt_token, id_to_follow).await;
+        thread::sleep(message_rate_limit);
+
+        match follow_community_result {
+            Ok(response) => {
+                if response.community_view.subscribed == lemmy_api_common::lemmy_db_schema::SubscribedType::NotSubscribed {
+                    format!("Server refused to follow community {}", follow_community_string);
+                }
+            }
+            Err(e) => logger(format!("Got exception following community {}: {:?}", follow_community_string, e)),
+        }
     }
     
-    // TODO: Call API to apply settings
+    // Save profile settings
+    let save_settings_result = api.save_user_settings(&instance, &jwt_token, new_profile.profile_settings).await;
+    if save_settings_result.is_err() {
+        logger(format!("Cannot save profile settings, got exception {:?}", save_settings_result.unwrap_err()));
+    }
+
+    logger(format!("Finished!"));
 }
 
 fn main() {
