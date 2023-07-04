@@ -6,7 +6,7 @@
 
 1. Create an account on the server you want to migrate to.
 2. Run LASIM, enter your old account credentials, and hit "Download". Your information is saved to a local file.
-3. In LASIM, enter your new account credentials and hit "Upload".
+3. In LASIM, hit the Upload tab, then enter your new account credentials and hit "Upload".
 4. The local file is used to update your new account's blocked users, blocked communities, followed communities, and *most* profile settings.
 5. That's it!
 
