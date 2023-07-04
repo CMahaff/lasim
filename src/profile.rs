@@ -91,7 +91,8 @@ fn construct_followed_communities(original_profile: &site::GetSiteResponse) -> V
 }
 
 pub fn construct_profile(original_profile: &site::GetSiteResponse) -> ProfileConfiguration {
-    let local_user_view = &(original_profile.my_user.as_ref().unwrap().local_user_view);
+    let my_user = &(original_profile.my_user.as_ref().unwrap());
+    let local_user_view = &(my_user.local_user_view);
     let local_user = &(local_user_view.local_user);
     let person = &(local_user_view.person);
 
@@ -112,7 +113,7 @@ pub fn construct_profile(original_profile: &site::GetSiteResponse) -> ProfileCon
             show_bot_accounts: local_user.show_bot_accounts,
             show_read_posts: local_user.show_read_posts,
             show_new_post_notifs: local_user.show_new_post_notifs,
-            discussion_languages: typecast::FromAPI::cast_language_array(&original_profile.discussion_languages),
+            discussion_languages: typecast::FromAPI::cast_language_array(&my_user.discussion_languages),
             open_links_in_new_tab: local_user.open_links_in_new_tab,
         },
     };

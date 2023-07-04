@@ -231,7 +231,7 @@ impl API {
         user_settings_api.auth = Sensitive::new(jwt_token.clone());
     
         let response: Response = self.client
-            .post(instance.clone() + "/api/v3/user/save_user_settings")
+            .put(instance.clone() + "/api/v3/user/save_user_settings")
             .json(&user_settings_api)
             .send()
             .await?;

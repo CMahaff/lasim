@@ -236,7 +236,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     }
     
     // Save profile settings
-    let save_settings_result = api.save_user_settings(&instance, &jwt_token, new_profile.profile_settings).await;
+    let save_settings_result = api.save_user_settings(&instance, &jwt_token, profile_changes.profile_settings).await;
     if save_settings_result.is_err() {
         logger(format!("Cannot save profile settings, got exception {:?}", save_settings_result.unwrap_err()));
     }
