@@ -4,6 +4,7 @@ use lemmy_api_common::site;
 use lemmy_api_common::community;
 use lemmy_api_common::lemmy_db_schema::newtypes;
 use reqwest::Client;
+use reqwest::ClientBuilder;
 use reqwest::Response;
 use reqwest::Error;
 use url::Url;
@@ -16,8 +17,12 @@ pub struct API {
 
 impl API {
     pub fn new(instance: Url) -> API {
-        API {
-            client: Client::new(),
+        let mut client_builder = ClientBuilder::new();
+        client_builder = client_builder.user_agent("LASIM - https://github.com/CMahaff/lasim");
+        let new_client = client_builder.build().unwrap();
+
+        return API {
+            client: new_client,
             instance,
         }
     }
