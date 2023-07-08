@@ -31,4 +31,4 @@
 ## Version Support
 | LASIM Version | LASIM Profile Version | Supported Lemmy BE API Version |
 | ------------- | --------------------- | ------------------------------ |
-| 0.1.0         | 1                     | 0.18.1-rc.9+                   |
+| 0.1.\*        | 1                     | 0.18.1 (rc.9+)                 |
