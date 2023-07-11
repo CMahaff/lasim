@@ -10,12 +10,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_linux:
+  build_ubuntu:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose --release
+    - name: Set File Permissions
+      run: chmod 755 target/release/lasim
     - name: Run tests
       run: cargo test --verbose
     - name: Upload Binary
@@ -37,12 +39,14 @@ jobs:
       with:
         name: lasim_windows
         path: target/release/lasim.exe
-  build_mac:
+  build_macos:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v3
     - name: Build
       run: cargo build --verbose --release
+    - name: Set File Permissions
+      run: chmod 755 target/release/lasim
     - name: Run tests
       run: cargo test --verbose
     - name: Upload Binary
