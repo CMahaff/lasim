@@ -25,6 +25,22 @@ struct ProcessingInstruction {
     instance: SharedString,
     username: SharedString,
     password: SharedString,
+    two_factor_token: SharedString,
+}
+
+fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
+    if token.is_empty() {
+        return Ok(None);
+    }
+
+    if token.chars().count() != 6 {
+        return Err("2FA Token should be 6 characters")
+    }
+
+    match token.parse::<u32>() {
+        Ok(_) => Ok(Some(token.clone())),
+        Err(_) => Err("2FA Token should be a number"),
+    }
 }
 
 fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
@@ -54,6 +70,13 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     let mut instance = processing_instruction.instance.to_string();
     let username = processing_instruction.username.to_string();
     let password = processing_instruction.password.to_string();
+    let two_factor_token = match evaluate_two_factor_token(&processing_instruction.two_factor_token.to_string()) {
+        Ok(token) => token,
+        Err(e) => {
+            logger(format!("ERROR: Invalid 2FA Token - {}", e));
+            return;
+        },
+    };
 
     if !instance.starts_with("http") {
         instance.insert_str(0, "https://");
@@ -69,7 +92,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 
     // Login
     logger(format!("Logging in as {}", username));
-    let jwt_token_future = api.login(&username, &password);
+    let jwt_token_future = api.login(&username, &password, two_factor_token);
     let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
@@ -129,6 +152,13 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let mut instance = processing_instruction.instance.to_string();
     let username = processing_instruction.username.to_string();
     let password = processing_instruction.password.to_string();
+    let two_factor_token = match evaluate_two_factor_token(&processing_instruction.two_factor_token.to_string()) {
+        Ok(token) => token,
+        Err(e) => {
+            logger(format!("ERROR: Invalid 2FA Token - {}", e));
+            return;
+        },
+    };
 
     if !instance.starts_with("http") {
         instance.insert_str(0, "https://");
@@ -144,7 +174,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
 
     // Login
     logger(format!("Logging in as {}", username));
-    let jwt_token_future = api.login(&username, &password);
+    let jwt_token_future = api.login(&username, &password, two_factor_token);
     let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
@@ -334,6 +364,7 @@ fn main() {
                     instance: app_weak_clone.unwrap().get_download_instance_url(),
                     username: app_weak_clone.unwrap().get_download_username_input(),
                     password: app_weak_clone.unwrap().get_download_password_input(),
+                    two_factor_token: app_weak_clone.unwrap().get_download_two_factor_input(),
                 };
 
                 instruct_tx.send(download_instruction).unwrap();
@@ -346,6 +377,7 @@ fn main() {
                     instance: app_weak_clone.unwrap().get_upload_instance_url(),
                     username: app_weak_clone.unwrap().get_upload_username_input(),
                     password: app_weak_clone.unwrap().get_upload_password_input(),
+                    two_factor_token: app_weak_clone.unwrap().get_upload_two_factor_input(),
                 };
 
                 instruct_tx.send(upload_instruction).unwrap();
@@ -362,6 +394,7 @@ fn main() {
         instance: "".into(),
         username: "".into(),
         password: "".into(),
+        two_factor_token: "".into(),
     }).unwrap();
     main_thread.join().unwrap();
 }
