@@ -10,6 +10,7 @@ export component ControlPage inherits VerticalBox {
     out property <string> instance_url: instance_url_object.text;
     out property <string> username_input: username_input_object.text;
     out property <string> password_input: password_input_object.text;
+    out property <string> two_factor_input: two_factor_input_object.text;
     in property <string> log_output;
     in property <bool> ui_enabled: true;
 
@@ -28,6 +29,11 @@ export component ControlPage inherits VerticalBox {
     password_input_object := LineEdit {
         placeholder-text: "Password";
         input-type: password;
+        width: 250px;
+        enabled: ui_enabled;
+    }
+    two_factor_input_object := LineEdit {
+        placeholder-text: "2FA Token (if enabled)";
         width: 250px;
         enabled: ui_enabled;
     }
