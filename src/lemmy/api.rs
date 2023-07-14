@@ -72,11 +72,11 @@ impl API {
                 let json_result = response.json::<site::GetSiteResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
-                    Err(e) => return Err(e),
+                    Err(e) => return Err(e.without_url()),
                 }
             },
             Err(e) => {
-                return Err(e);
+                return Err(e.without_url());
             }
         }
     }
@@ -102,11 +102,11 @@ impl API {
                 let json_result = response.json::<community::GetCommunityResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
-                    Err(e) => return Err(e),
+                    Err(e) => return Err(e.without_url()),
                 }
             },
             Err(e) => {
-                return Err(e);
+                return Err(e.without_url());
             }
         }
     }
@@ -194,11 +194,11 @@ impl API {
                 let json_result = response.json::<person::GetPersonDetailsResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
-                    Err(e) => return Err(e),
+                    Err(e) => return Err(e.without_url()),
                 }
             },
             Err(e) => {
-                return Err(e);
+                return Err(e.without_url());
             }
         }
     }
