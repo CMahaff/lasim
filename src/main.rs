@@ -19,6 +19,7 @@ slint::include_modules!();
 
 // TODO: In the future, if needed, support versioning of this file. For now, hard-code.
 const PROFILE_FILENAME: &str = "profile_v1.json";
+const PANIC_LOG: &str = "error.log";
 
 struct ProcessingInstruction {
     instruction_type: SharedString,
@@ -26,6 +27,16 @@ struct ProcessingInstruction {
     username: SharedString,
     password: SharedString,
     two_factor_token: SharedString,
+}
+
+fn write_panic_info(info: &String) {
+    let path = Path::new(PANIC_LOG);
+    let mut file = match File::create(&path) {
+        Ok(file) => file,
+        Err(_) => return
+    };
+
+    file.write_all(info.as_bytes()).ok();
 }
 
 fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
@@ -298,6 +309,18 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
 }
 
 fn main() {
+    // Setup some kind of logging for if we crash
+    let panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            write_panic_info(&format!("Unexpected Error Occurred: {s:?}"));
+        } else {
+            write_panic_info(&"Unknown Error Occurred!".to_string());
+        }
+        panic_hook(panic_info);
+        std::process::exit(1);
+    }));
+
     // Setup processing thread communication
     let (instruct_tx, instruct_rx): (Sender<ProcessingInstruction>, Receiver<ProcessingInstruction>) = mpsc::channel();
     let instruct_tx_copy = instruct_tx.clone();
