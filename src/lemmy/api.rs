@@ -27,12 +27,12 @@ impl API {
         }
     }
 
-    pub async fn login(&self, username: &String, password: &String) -> Result<String, Error> {
+    pub async fn login(&self, username: &String, password: &String, two_factor_token: Option<String>) -> Result<String, Error> {
         let url = self.instance.join("/api/v3/user/login").unwrap();
         let params = person::Login {
             username_or_email: Sensitive::new(username.clone()),
             password: Sensitive::new(password.clone()),
-            ..Default::default() // TODO: Add totp_2fa_token for instances with 2-factor
+            totp_2fa_token: two_factor_token,
         };
     
         let response: Response = self.client
@@ -72,11 +72,11 @@ impl API {
                 let json_result = response.json::<site::GetSiteResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
-                    Err(e) => return Err(e),
+                    Err(e) => return Err(e.without_url()),
                 }
             },
             Err(e) => {
-                return Err(e);
+                return Err(e.without_url());
             }
         }
     }
@@ -102,11 +102,11 @@ impl API {
                 let json_result = response.json::<community::GetCommunityResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
-                    Err(e) => return Err(e),
+                    Err(e) => return Err(e.without_url()),
                 }
             },
             Err(e) => {
-                return Err(e);
+                return Err(e.without_url());
             }
         }
     }
@@ -194,11 +194,11 @@ impl API {
                 let json_result = response.json::<person::GetPersonDetailsResponse>().await;
                 match json_result {
                     Ok(json) => return Ok(json),
-                    Err(e) => return Err(e),
+                    Err(e) => return Err(e.without_url()),
                 }
             },
             Err(e) => {
-                return Err(e);
+                return Err(e.without_url());
             }
         }
     }

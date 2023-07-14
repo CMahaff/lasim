@@ -15,3 +15,4 @@ Cargo.lock
 
 # Generated when running application
 profile*.json
+error.log

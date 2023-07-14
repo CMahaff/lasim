@@ -19,12 +19,39 @@ slint::include_modules!();
 
 // TODO: In the future, if needed, support versioning of this file. For now, hard-code.
 const PROFILE_FILENAME: &str = "profile_v1.json";
+const PANIC_LOG: &str = "error.log";
 
 struct ProcessingInstruction {
     instruction_type: SharedString,
     instance: SharedString,
     username: SharedString,
     password: SharedString,
+    two_factor_token: SharedString,
+}
+
+fn write_panic_info(info: &String) {
+    let path = Path::new(PANIC_LOG);
+    let mut file = match File::create(&path) {
+        Ok(file) => file,
+        Err(_) => return
+    };
+
+    file.write_all(info.as_bytes()).ok();
+}
+
+fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
+    if token.is_empty() {
+        return Ok(None);
+    }
+
+    if token.chars().count() != 6 {
+        return Err("2FA Token should be 6 characters")
+    }
+
+    match token.parse::<u32>() {
+        Ok(_) => Ok(Some(token.clone())),
+        Err(_) => Err("2FA Token should be a number"),
+    }
 }
 
 fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
@@ -54,6 +81,13 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     let mut instance = processing_instruction.instance.to_string();
     let username = processing_instruction.username.to_string();
     let password = processing_instruction.password.to_string();
+    let two_factor_token = match evaluate_two_factor_token(&processing_instruction.two_factor_token.to_string()) {
+        Ok(token) => token,
+        Err(e) => {
+            logger(format!("ERROR: Invalid 2FA Token - {}", e));
+            return;
+        },
+    };
 
     if !instance.starts_with("http") {
         instance.insert_str(0, "https://");
@@ -69,7 +103,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 
     // Login
     logger(format!("Logging in as {}", username));
-    let jwt_token_future = api.login(&username, &password);
+    let jwt_token_future = api.login(&username, &password, two_factor_token);
     let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
@@ -129,6 +163,13 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let mut instance = processing_instruction.instance.to_string();
     let username = processing_instruction.username.to_string();
     let password = processing_instruction.password.to_string();
+    let two_factor_token = match evaluate_two_factor_token(&processing_instruction.two_factor_token.to_string()) {
+        Ok(token) => token,
+        Err(e) => {
+            logger(format!("ERROR: Invalid 2FA Token - {}", e));
+            return;
+        },
+    };
 
     if !instance.starts_with("http") {
         instance.insert_str(0, "https://");
@@ -144,7 +185,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
 
     // Login
     logger(format!("Logging in as {}", username));
-    let jwt_token_future = api.login(&username, &password);
+    let jwt_token_future = api.login(&username, &password, two_factor_token);
     let jwt_token_result = block_on(jwt_token_future);
     if jwt_token_result.is_err() {
         logger(format!("ERROR: Failed Login - {}", jwt_token_result.unwrap_err()));
@@ -268,6 +309,18 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
 }
 
 fn main() {
+    // Setup some kind of logging for if we crash
+    let panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            write_panic_info(&format!("Unexpected Error Occurred: {s:?}"));
+        } else {
+            write_panic_info(&"Unknown Error Occurred!".to_string());
+        }
+        panic_hook(panic_info);
+        std::process::exit(1);
+    }));
+
     // Setup processing thread communication
     let (instruct_tx, instruct_rx): (Sender<ProcessingInstruction>, Receiver<ProcessingInstruction>) = mpsc::channel();
     let instruct_tx_copy = instruct_tx.clone();
@@ -334,6 +387,7 @@ fn main() {
                     instance: app_weak_clone.unwrap().get_download_instance_url(),
                     username: app_weak_clone.unwrap().get_download_username_input(),
                     password: app_weak_clone.unwrap().get_download_password_input(),
+                    two_factor_token: app_weak_clone.unwrap().get_download_two_factor_input(),
                 };
 
                 instruct_tx.send(download_instruction).unwrap();
@@ -346,6 +400,7 @@ fn main() {
                     instance: app_weak_clone.unwrap().get_upload_instance_url(),
                     username: app_weak_clone.unwrap().get_upload_username_input(),
                     password: app_weak_clone.unwrap().get_upload_password_input(),
+                    two_factor_token: app_weak_clone.unwrap().get_upload_two_factor_input(),
                 };
 
                 instruct_tx.send(upload_instruction).unwrap();
@@ -362,6 +417,7 @@ fn main() {
         instance: "".into(),
         username: "".into(),
         password: "".into(),
+        two_factor_token: "".into(),
     }).unwrap();
     main_thread.join().unwrap();
 }

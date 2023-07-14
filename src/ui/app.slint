@@ -6,18 +6,20 @@ export component App inherits Window {
     out property <string> download_instance_url: download_page.instance_url;
     out property <string> download_username_input: download_page.username_input;
     out property <string> download_password_input: download_page.password_input;
+    out property <string> download_two_factor_input: download_page.two_factor_input;
     in property <string> download_log_output <=> download_page.log_output;
     in property <bool> download_ui_enabled <=> download_page.ui_enabled;
 
     out property <string> upload_instance_url: upload_page.instance_url;
     out property <string> upload_username_input: upload_page.username_input;
     out property <string> upload_password_input: upload_page.password_input;
+    out property <string> upload_two_factor_input: upload_page.two_factor_input;
     in property <string> upload_log_output <=> upload_page.log_output;
     in property <bool> upload_ui_enabled <=> upload_page.ui_enabled;
 
     title: "LASIM";
     width: 280px;
-    height: 330px;
+    height: 370px;
 
     VerticalBox {
         alignment: start;
