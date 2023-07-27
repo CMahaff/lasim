@@ -1,6 +1,7 @@
 import { TabWidget, VerticalBox, TextEdit } from "std-widgets.slint";
 import { ControlPage, ControlPageHandler } from "control_page.slint";
-export { ControlPageHandler }
+import { SettingsPage, SettingsPageHandler } from "settings_page.slint";
+export { ControlPageHandler, SettingsPageHandler }
 
 export component App inherits Window {
     out property <string> download_instance_url: download_page.instance_url;
@@ -17,9 +18,18 @@ export component App inherits Window {
     in property <string> upload_log_output <=> upload_page.log_output;
     in property <bool> upload_ui_enabled <=> upload_page.ui_enabled;
 
+    in property <bool> upload_profile_settings <=> settings_page.upload_profile_settings;
+    in property <bool> upload_community_subs <=> settings_page.upload_community_subs;
+    in property <bool> upload_community_blocks <=> settings_page.upload_community_blocks;
+    in property <bool> upload_user_blocks <=> settings_page.upload_user_blocks;
+    in property <bool> upload_user_saved_posts <=> settings_page.upload_user_saved_posts;
+    in property <bool> sync_removals <=> settings_page.sync_removals;
+    in property <bool> confirm_uploads  <=> settings_page.confirm_uploads;
+    in property <bool> write_api_profiles <=> settings_page.write_api_profiles;
+
     title: "LASIM";
     width: 280px;
-    height: 370px;
+    height: 440px;
 
     VerticalBox {
         alignment: start;
@@ -32,10 +42,13 @@ export component App inherits Window {
             }
             Tab {
                 title: "Upload";
-
                 upload_page := ControlPage {
                     type: "Upload";
                 }
+            }
+            Tab {
+                title: "Settings";
+                settings_page := SettingsPage {}
             }
             Tab {
                 title: "About";
@@ -47,7 +60,7 @@ export component App inherits Window {
                     Text {
                         font-size: 20px;
                         font-weight: 900;
-                        text: "LASIM 0.2.0";
+                        text: "LASIM 0.2.1";
                     }
                     Text {
                         text: "Lemmy BE API Version 0.18.3";

@@ -5,6 +5,7 @@ mod lemmy;
 mod profile;
 mod migrations;
 
+use lemmy::typecast::FromAPI;
 use slint::Weak;
 use slint::SharedString;
 use url::Url;
@@ -19,14 +20,94 @@ use futures::executor::block_on;
 
 slint::include_modules!();
 
+const CONFIG_FILENAME: &str = ".lasim_config.json";
 const PANIC_LOG: &str = "error.log";
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct GlobalSettings {
+    pub upload_profile_settings: bool,
+    pub upload_community_subs: bool,
+    pub upload_community_blocks: bool,
+    pub upload_user_blocks: bool,
+    pub upload_user_saved_posts: bool,
+    pub sync_removals: bool,
+    pub confirm_uploads: bool,
+    pub write_api_profiles: bool,
+}
+
+#[derive(Debug)]
 struct ProcessingInstruction {
     instruction_type: SharedString,
     instance: SharedString,
     username: SharedString,
     password: SharedString,
     two_factor_token: SharedString,
+    global_settings: GlobalSettings,
+}
+
+fn read_global_settings() -> Result<GlobalSettings, String> {
+    let home_directory = match home::home_dir() {
+        Some(home_dir) => home_dir,
+        None => return Err("Cannot identify home directory.".to_string()),
+    };
+    let config_path = home_directory.join(CONFIG_FILENAME);
+    let config_json_result = std::fs::read_to_string(config_path);
+    let config_json = match config_json_result {
+        Ok(file) => file,
+        Err(_) => return Err("Cannot read config file.".to_string()),
+    };
+
+    let config_result: Result<GlobalSettings, serde_json::Error> = serde_json::from_slice(config_json.as_bytes());
+    let config = match config_result {
+        Ok(config) => config,
+        Err(_) => return Err("Cannot convert JSON to object".to_string()),
+    };
+
+    return Ok(config);
+}
+
+fn apply_global_settings(app: Weak<App>) {
+    let global_settings = match read_global_settings() {
+        Ok(config) => config,
+        Err(_) => {
+            GlobalSettings {
+                upload_profile_settings: true,
+                upload_community_subs: true,
+                upload_community_blocks: true,
+                upload_user_blocks: true,
+                upload_user_saved_posts: false,
+                sync_removals: false,
+                confirm_uploads: true,
+                write_api_profiles: false,
+            }
+        },
+    };
+
+    app.unwrap().set_upload_profile_settings(global_settings.upload_profile_settings);
+    app.unwrap().set_upload_community_subs(global_settings.upload_community_subs);
+    app.unwrap().set_upload_community_blocks(global_settings.upload_community_blocks);
+    app.unwrap().set_upload_user_blocks(global_settings.upload_user_blocks);
+    app.unwrap().set_upload_user_saved_posts(global_settings.upload_user_saved_posts);
+    app.unwrap().set_sync_removals(global_settings.sync_removals);
+    app.unwrap().set_confirm_uploads(global_settings.confirm_uploads);
+    app.unwrap().set_write_api_profiles(global_settings.write_api_profiles);
+}
+
+fn write_global_settings(global_settings: GlobalSettings) {
+    let home_directory = match home::home_dir() {
+        Some(home_dir) => home_dir,
+        None => return,
+    };
+    let config_path = home_directory.join(CONFIG_FILENAME);
+    let mut file = match File::create(&config_path) {
+        Ok(file) => file,
+        Err(_) => {
+            return 
+        }
+    };
+
+    let json_string = serde_json::to_string_pretty(&global_settings);
+    file.write_all(format!("{}", json_string.unwrap()).as_bytes()).ok();
 }
 
 fn write_panic_info(info: &String) {
@@ -125,7 +206,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     logger("Profile retrieved!".to_string());
 
     // Convert Profile
-    let profile_local = profile::construct_profile(&profile_settings);
+    let profile_local = FromAPI::construct_profile(&profile_settings);
 
     // Write to File
     write_profile(&profile_local, logger);
@@ -194,14 +275,17 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     logger("Existing Settings Downloaded. Calculating delta...".to_string());
 
     // Convert
-    let new_profile = profile::construct_profile(&new_profile_api);
+    let new_profile = FromAPI::construct_profile(&new_profile_api);
 
     // Calculating Differences
     let profile_changes = profile::calculate_changes(&original_profile, &new_profile);
     logger("All profile settings from the original profile will be applied.".to_string());
-    logger(format!("{} new users will be blocked", profile_changes.blocked_users.len()));
-    logger(format!("{} new communities will be blocked", profile_changes.blocked_communities.len()));
-    logger(format!("{} new communities will be followed", profile_changes.followed_communities.len()));
+    logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
+    logger(format!("{} users will be unblocked", profile_changes.users_to_unblock.len()));
+    logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
+    logger(format!("{} communities will be unblocked", profile_changes.communities_to_unblock.len()));
+    logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
+    logger(format!("{} communities will be unfollowed", profile_changes.communities_to_unfollow.len()));
 
     // Call API to actually apply changes to new account
 
@@ -210,7 +294,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let message_rate_limit = std::time::Duration::from_millis((1000f64 / message_per_second as f64).ceil() as u64);
 
     // Block Users
-    for blocked_user_string in profile_changes.blocked_users {
+    for blocked_user_string in profile_changes.users_to_block {
         let user_details_result = api.fetch_user_details(&jwt_token, &blocked_user_string).await;
         thread::sleep(message_rate_limit);
 
@@ -236,7 +320,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     }
     
     // Block Communities
-    for blocked_community_string in profile_changes.blocked_communities {
+    for blocked_community_string in profile_changes.communities_to_block {
         let community_details_result = api.fetch_community_by_name(&jwt_token, &blocked_community_string).await;
         thread::sleep(message_rate_limit);
 
@@ -262,7 +346,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     }
     
     // Follow Communities
-    for follow_community_string in profile_changes.followed_communities {
+    for follow_community_string in profile_changes.communities_to_follow {
         let community_details_result = api.fetch_community_by_name(&jwt_token, &follow_community_string).await;
         thread::sleep(message_rate_limit);
 
@@ -316,7 +400,9 @@ fn main() {
     // Construct Slint App
     let app = App::new().unwrap();
     let app_weak: Weak<App> = app.as_weak();
-    let app_weak_clone = app_weak.clone();
+    let app_control_page = app_weak.clone();
+    let app_settings_page = app_weak.clone();
+    let app_apply_settings = app_weak.clone();
 
     // Main instruction processing thread
     let main_thread = thread::spawn(move || {
@@ -363,38 +449,72 @@ fn main() {
         }
     });
 
-    // Bind thread action to Click Event
+    // Bind Control Page clicking action
     app.global::<ControlPageHandler>().on_clicked({
-        move |window_type| {            
+        move |window_type| {      
+            let global_settings = GlobalSettings { 
+                upload_profile_settings: app_control_page.unwrap().get_upload_profile_settings(),
+                upload_community_subs: app_control_page.unwrap().get_upload_community_subs(),
+                upload_community_blocks: app_control_page.unwrap().get_upload_community_blocks(),
+                upload_user_blocks: app_control_page.unwrap().get_upload_user_blocks(),
+                upload_user_saved_posts: app_control_page.unwrap().get_upload_user_saved_posts(),
+                sync_removals: app_control_page.unwrap().get_sync_removals(),
+                confirm_uploads: app_control_page.unwrap().get_confirm_uploads(),
+                write_api_profiles: app_control_page.unwrap().get_write_api_profiles(),
+            };
+
             if window_type == "Download" {
-                app_weak_clone.unwrap().set_download_log_output("".into());
-                app_weak_clone.unwrap().set_download_ui_enabled(false);
+                app_control_page.unwrap().set_download_log_output("".into());
+                app_control_page.unwrap().set_download_ui_enabled(false);
 
                 let download_instruction = ProcessingInstruction {
                     instruction_type: window_type,
-                    instance: app_weak_clone.unwrap().get_download_instance_url(),
-                    username: app_weak_clone.unwrap().get_download_username_input(),
-                    password: app_weak_clone.unwrap().get_download_password_input(),
-                    two_factor_token: app_weak_clone.unwrap().get_download_two_factor_input(),
+                    instance: app_control_page.unwrap().get_download_instance_url(),
+                    username: app_control_page.unwrap().get_download_username_input(),
+                    password: app_control_page.unwrap().get_download_password_input(),
+                    two_factor_token: app_control_page.unwrap().get_download_two_factor_input(),
+                    global_settings: global_settings,
                 };
 
                 instruct_tx.send(download_instruction).unwrap();
             } else {
-                app_weak_clone.unwrap().set_upload_log_output("".into());
-                app_weak_clone.unwrap().set_upload_ui_enabled(false);
+                app_control_page.unwrap().set_upload_log_output("".into());
+                app_control_page.unwrap().set_upload_ui_enabled(false);
 
                 let upload_instruction = ProcessingInstruction {
                     instruction_type: window_type,
-                    instance: app_weak_clone.unwrap().get_upload_instance_url(),
-                    username: app_weak_clone.unwrap().get_upload_username_input(),
-                    password: app_weak_clone.unwrap().get_upload_password_input(),
-                    two_factor_token: app_weak_clone.unwrap().get_upload_two_factor_input(),
+                    instance: app_control_page.unwrap().get_upload_instance_url(),
+                    username: app_control_page.unwrap().get_upload_username_input(),
+                    password: app_control_page.unwrap().get_upload_password_input(),
+                    two_factor_token: app_control_page.unwrap().get_upload_two_factor_input(),
+                    global_settings: global_settings,
                 };
 
                 instruct_tx.send(upload_instruction).unwrap();
             }
         }
     });
+
+    // Bind to toggline of settings
+    app.global::<SettingsPageHandler>().on_toggled({
+        move || {
+            let global_settings = GlobalSettings { 
+                upload_profile_settings: app_settings_page.unwrap().get_upload_profile_settings(),
+                upload_community_subs: app_settings_page.unwrap().get_upload_community_subs(),
+                upload_community_blocks: app_settings_page.unwrap().get_upload_community_blocks(),
+                upload_user_blocks: app_settings_page.unwrap().get_upload_user_blocks(),
+                upload_user_saved_posts: app_settings_page.unwrap().get_upload_user_saved_posts(),
+                sync_removals: app_settings_page.unwrap().get_sync_removals(),
+                confirm_uploads: app_settings_page.unwrap().get_confirm_uploads(),
+                write_api_profiles: app_settings_page.unwrap().get_write_api_profiles(),
+            };
+    
+            write_global_settings(global_settings);
+        }
+    });
+
+    // Load Settings
+    apply_global_settings(app_apply_settings);
 
     // Run GUI application
     app.run().unwrap();
@@ -406,6 +526,16 @@ fn main() {
         username: "".into(),
         password: "".into(),
         two_factor_token: "".into(),
+        global_settings: GlobalSettings { 
+            upload_profile_settings: false,
+            upload_community_subs: false,
+            upload_community_blocks: false,
+            upload_user_blocks: false,
+            upload_user_saved_posts: false,
+            sync_removals: false,
+            confirm_uploads: false,
+            write_api_profiles: false,
+        },
     }).unwrap();
     main_thread.join().unwrap();
 }

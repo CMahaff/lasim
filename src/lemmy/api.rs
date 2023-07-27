@@ -9,6 +9,7 @@ use reqwest::Response;
 use reqwest::Error;
 use url::Url;
 use crate::profile;
+use crate::lemmy::typecast::ToAPI;
 
 pub struct Api {
     client: Client,
@@ -239,7 +240,7 @@ impl Api {
         user_settings_local: profile::ProfileSettings) -> Result<person::LoginResponse, Error> {
 
         let url = self.instance.join("/api/v3/user/save_user_settings").unwrap();
-        let mut user_settings_api = profile::construct_settings(&user_settings_local);
+        let mut user_settings_api = ToAPI::construct_settings(&user_settings_local);
         user_settings_api.auth = Sensitive::new(jwt_token.to_string());
     
         let response: Response = self.client

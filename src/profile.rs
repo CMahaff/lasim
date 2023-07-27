@@ -1,9 +1,3 @@
-use lemmy_api_common::sensitive::Sensitive;
-use lemmy_api_common::site;
-use lemmy_api_common::person;
-
-use crate::lemmy::typecast;
-
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ProfileSettings {
     pub show_nsfw: bool,
@@ -31,101 +25,15 @@ pub struct ProfileConfiguration {
     pub profile_settings: ProfileSettings,
 }
 
-pub fn construct_settings(profile_settings: &ProfileSettings) -> person::SaveUserSettings {
-    return person::SaveUserSettings {
-        show_nsfw: Some(profile_settings.show_nsfw),
-        show_scores: Some(profile_settings.show_scores),
-        theme: Some(profile_settings.theme.clone()),
-        default_sort_type: Some(typecast::ToAPI::cast_sort_type(&profile_settings.default_sort_type)),
-        default_listing_type: Some(typecast::ToAPI::cast_listing_type(&profile_settings.default_listing_type)),
-        interface_language: Some(profile_settings.interface_language.clone()),
-        avatar: None, // TODO: Support Avatar migration
-        banner: None, // TODO: Support Banner migration
-        display_name: None, // Don't Change
-        email: None, // Don't Change
-        bio: None, // Don't Change
-        matrix_user_id: None, // Don't Change
-        show_avatars: Some(profile_settings.show_avatars),
-        send_notifications_to_email: Some(profile_settings.send_notifications_to_email),
-        bot_account: Some(profile_settings.bot_account),
-        show_bot_accounts: Some(profile_settings.show_bot_accounts),
-        show_read_posts: Some(profile_settings.show_read_posts),
-        show_new_post_notifs: Some(profile_settings.show_new_post_notifs),
-        discussion_languages: Some(typecast::ToAPI::cast_language_array(&profile_settings.discussion_languages)),
-        generate_totp_2fa: None, // Don't change
-        auth: Sensitive::from(""), // This will be inserted before the request is sent
-        open_links_in_new_tab: Some(profile_settings.open_links_in_new_tab),
-        infinite_scroll_enabled: Some(profile_settings.infinite_scroll_enabled),
-    };
-}
-
-fn construct_blocked_users(original_profile: &site::GetSiteResponse) -> Vec<String> {
-    let original_blocks = &(original_profile.my_user.as_ref().unwrap().person_blocks);
-    let mut new_blocks = vec![];
-
-    for orig_block_view in original_blocks {
-        new_blocks.push(parse_url(orig_block_view.target.actor_id.to_string()));
-    }
-
-    return new_blocks;
-}
-
-fn construct_blocked_communities(original_profile: &site::GetSiteResponse) -> Vec<String> {
-    let original_blocks = &(original_profile.my_user.as_ref().unwrap().community_blocks);
-    let mut new_blocks = vec![];
-
-    for orig_block_view in original_blocks {
-        new_blocks.push(parse_url(orig_block_view.community.actor_id.to_string()));
-    }
-
-    return new_blocks;
-}
-
-fn construct_followed_communities(original_profile: &site::GetSiteResponse) -> Vec<String> {
-    let original_follows= &(original_profile.my_user.as_ref().unwrap().follows);
-    let mut new_follows = vec![];
-
-    for orig_follow_view in original_follows {
-        new_follows.push(parse_url(orig_follow_view.community.actor_id.to_string()));
-    }
-
-    return new_follows;
-}
-
-pub fn construct_profile(original_profile: &site::GetSiteResponse) -> ProfileConfiguration {
-    let my_user = &(original_profile.my_user.as_ref().unwrap());
-    let local_user_view = &(my_user.local_user_view);
-    let local_user = &(local_user_view.local_user);
-    let person = &(local_user_view.person);
-
-    return ProfileConfiguration {
-        blocked_users: construct_blocked_users(original_profile),
-        blocked_communities: construct_blocked_communities(original_profile),
-        followed_communities: construct_followed_communities(original_profile),
-        profile_settings: ProfileSettings {
-            show_nsfw: local_user.show_nsfw,
-            show_scores: local_user.show_scores,
-            theme: local_user.theme.clone(),
-            default_sort_type: typecast::FromAPI::cast_sort_type(local_user.default_sort_type).to_string(),
-            default_listing_type: typecast::FromAPI::cast_listing_type(local_user.default_listing_type).to_string(),
-            interface_language: local_user.interface_language.clone(),
-            show_avatars: local_user.show_avatars,
-            send_notifications_to_email: local_user.send_notifications_to_email,
-            bot_account: person.bot_account,
-            show_bot_accounts: local_user.show_bot_accounts,
-            show_read_posts: local_user.show_read_posts,
-            show_new_post_notifs: local_user.show_new_post_notifs,
-            discussion_languages: typecast::FromAPI::cast_language_array(&my_user.discussion_languages),
-            open_links_in_new_tab: local_user.open_links_in_new_tab,
-            infinite_scroll_enabled: local_user.infinite_scroll_enabled,
-        },
-    };
-}
-
-fn parse_url(actor_id: String) -> String {
-    let removed_begin = actor_id.strip_prefix("https://").unwrap_or(&actor_id);
-    let split_url: Vec<&str> = removed_begin.split('/').collect();
-    return format!("{}@{}", split_url.get(2).unwrap(), split_url.first().unwrap());
+#[derive(Debug, Clone)]
+pub struct ProfileChanges {
+    pub users_to_block: Vec<String>,
+    pub users_to_unblock: Vec<String>,
+    pub communities_to_block: Vec<String>,
+    pub communities_to_unblock: Vec<String>,
+    pub communities_to_follow: Vec<String>,
+    pub communities_to_unfollow: Vec<String>,
+    pub profile_settings: ProfileSettings,
 }
 
 fn calculate_users_to_block(original_profile: &ProfileConfiguration, new_profile: &ProfileConfiguration) -> Vec<String> {
@@ -194,11 +102,14 @@ fn calculate_communities_to_follow(original_profile: &ProfileConfiguration, new_
     return new_follow_requests;
 }
 
-pub fn calculate_changes(original_profile: &ProfileConfiguration, new_profile: &ProfileConfiguration) -> ProfileConfiguration {
-    return ProfileConfiguration {
-        blocked_users: calculate_users_to_block(original_profile, new_profile),
-        blocked_communities: calculate_communities_to_block(original_profile, new_profile),
-        followed_communities: calculate_communities_to_follow(original_profile, new_profile),
+pub fn calculate_changes(original_profile: &ProfileConfiguration, new_profile: &ProfileConfiguration) -> ProfileChanges {
+    return ProfileChanges {
+        users_to_block: calculate_users_to_block(original_profile, new_profile),
+        users_to_unblock: calculate_users_to_block(new_profile, original_profile),
+        communities_to_block: calculate_communities_to_block(original_profile, new_profile),
+        communities_to_unblock: calculate_communities_to_block(new_profile, original_profile),
+        communities_to_follow: calculate_communities_to_follow(original_profile, new_profile),
+        communities_to_unfollow: calculate_communities_to_follow(new_profile, original_profile),
         profile_settings: original_profile.profile_settings.clone(),
     };
 }
