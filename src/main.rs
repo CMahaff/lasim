@@ -18,7 +18,7 @@ use futures::executor::block_on;
 slint::include_modules!();
 
 // TODO: In the future, if needed, support versioning of this file. For now, hard-code.
-const PROFILE_FILENAME: &str = "profile_v1.json";
+const PROFILE_FILENAME: &str = "profile_v2.json";
 const PANIC_LOG: &str = "error.log";
 
 struct ProcessingInstruction {

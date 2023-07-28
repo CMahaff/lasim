@@ -20,6 +20,7 @@ pub struct ProfileSettings {
     show_new_post_notifs: bool,
     discussion_languages: Vec<i32>,
     open_links_in_new_tab: bool,
+    infinite_scroll_enabled: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -54,6 +55,7 @@ pub fn construct_settings(profile_settings: &ProfileSettings) -> person::SaveUse
         generate_totp_2fa: None, // Don't change
         auth: Sensitive::from(""), // This will be inserted before the request is sent
         open_links_in_new_tab: Some(profile_settings.open_links_in_new_tab),
+        infinite_scroll_enabled: Some(profile_settings.infinite_scroll_enabled),
     };
 }
 
@@ -115,6 +117,7 @@ pub fn construct_profile(original_profile: &site::GetSiteResponse) -> ProfileCon
             show_new_post_notifs: local_user.show_new_post_notifs,
             discussion_languages: typecast::FromAPI::cast_language_array(&my_user.discussion_languages),
             open_links_in_new_tab: local_user.open_links_in_new_tab,
+            infinite_scroll_enabled: local_user.infinite_scroll_enabled,
         },
     };
 }

@@ -21,7 +21,6 @@
 - This should go without saying, but obviously both your new and old accounts are still distinct - LASIM simply makes it easier to move from one to the other
 
 ## Limitations
-- This is alpha software and should be treated as such - always read the log output to verify there were no errors during transfer, and always confirm your new account's settings in the web UI. If you have issues, write a bug here on Github!
 - Versions of LASIM only target specific Lemmy BE API versions, which are currently changing rapidly. See the Version Support table.
     - As long as the "Profile Version" is the same between LASIM versions, it is possible to use different LASIM versions together to target Lemmy servers running different incompatible API versions.
     - At time of writing there is planned support, but no code written, to support migration from older Profile Versions to newer ones.
@@ -30,4 +29,5 @@
 ## Version Support
 | LASIM Version | LASIM Profile Version | Supported Lemmy BE API Version(s) |
 | ------------- | --------------------- | --------------------------------- |
-| 0.1.\*        | 1                     | 0.18.1 (rc.9+), 0.18.2, and above |
+| 0.1.\*        | 1                     | 0.18.1 (rc.9+), 0.18.2            |
+| 0.2.\*        | 2                     | 0.18.3 (rc.5+) and above          |

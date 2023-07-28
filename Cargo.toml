@@ -1,7 +1,7 @@
 [package]
 name = "lasim"
 authors = ["Connor Mahaffey"]
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 publish = false
@@ -9,7 +9,7 @@ build = "build.rs"
 
 [dependencies]
 slint = "~1.0.2"
-lemmy_api_common = "=0.18.1-rc.9"
+lemmy_api_common = { git = "https://github.com/LemmyNet/lemmy.git", tag = "0.18.3-rc.5" }
 reqwest = { version = "~0.11.18", features = ["json"] }
 futures = "~0.3"
 tokio = { version = "~1", features = ["full"] }
