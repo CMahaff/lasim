@@ -2,6 +2,7 @@
 
 mod lemmy;
 mod profile;
+mod migrations;
 
 use slint::Weak;
 use slint::SharedString;
@@ -17,8 +18,6 @@ use futures::executor::block_on;
 
 slint::include_modules!();
 
-// TODO: In the future, if needed, support versioning of this file. For now, hard-code.
-const PROFILE_FILENAME: &str = "profile_v1.json";
 const PANIC_LOG: &str = "error.log";
 
 struct ProcessingInstruction {
@@ -55,7 +54,8 @@ fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
 }
 
 fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
-    let path = Path::new(PROFILE_FILENAME);
+    let profile_filename = migrations::profile_migrate::get_latest_profile_name();
+    let path = Path::new(profile_filename.as_str());
     let mut file = match File::create(&path) {
         Ok(file) => file,
         Err(e) => {
@@ -132,20 +132,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 }
 
 fn read_profile() -> Result<profile::ProfileConfiguration, String> {
-    let path = Path::new(PROFILE_FILENAME);
-    let profile_json_result = std::fs::read_to_string(path);
-    let profile_json = match profile_json_result {
-        Ok(file) => file,
-        Err(_) => return Err("ERROR: Failed to open profile settings!".to_string()),
-    };
-
-    let profile_local_result: Result<profile::ProfileConfiguration, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
-    let profile_local = match profile_local_result {
-        Ok(profile) => profile,
-        Err(e) => return Err(format!("ERROR: Failed to parse profile JSON - {}", e)),
-    };
-
-    return Ok(profile_local);
+    return migrations::profile_migrate::read_latest_profile();
 }
 
 #[tokio::main]

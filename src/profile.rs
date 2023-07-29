@@ -6,20 +6,21 @@ use crate::lemmy::typecast;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ProfileSettings {
-    show_nsfw: bool,
-    show_scores: bool,
-    theme: String,
-    default_sort_type: String,
-    default_listing_type: String,
-    interface_language: String,
-    show_avatars: bool,
-    send_notifications_to_email: bool,
-    bot_account: bool,
-    show_bot_accounts: bool,
-    show_read_posts: bool,
-    show_new_post_notifs: bool,
-    discussion_languages: Vec<i32>,
-    open_links_in_new_tab: bool,
+    pub show_nsfw: bool,
+    pub show_scores: bool,
+    pub theme: String,
+    pub default_sort_type: String,
+    pub default_listing_type: String,
+    pub interface_language: String,
+    pub show_avatars: bool,
+    pub send_notifications_to_email: bool,
+    pub bot_account: bool,
+    pub show_bot_accounts: bool,
+    pub show_read_posts: bool,
+    pub show_new_post_notifs: bool,
+    pub discussion_languages: Vec<i32>,
+    pub open_links_in_new_tab: bool,
+    pub infinite_scroll_enabled: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
@@ -54,6 +55,7 @@ pub fn construct_settings(profile_settings: &ProfileSettings) -> person::SaveUse
         generate_totp_2fa: None, // Don't change
         auth: Sensitive::from(""), // This will be inserted before the request is sent
         open_links_in_new_tab: Some(profile_settings.open_links_in_new_tab),
+        infinite_scroll_enabled: Some(profile_settings.infinite_scroll_enabled),
     };
 }
 
@@ -115,6 +117,7 @@ pub fn construct_profile(original_profile: &site::GetSiteResponse) -> ProfileCon
             show_new_post_notifs: local_user.show_new_post_notifs,
             discussion_languages: typecast::FromAPI::cast_language_array(&my_user.discussion_languages),
             open_links_in_new_tab: local_user.open_links_in_new_tab,
+            infinite_scroll_enabled: local_user.infinite_scroll_enabled,
         },
     };
 }
