@@ -23,11 +23,11 @@
 ## Limitations
 - Versions of LASIM only target specific Lemmy BE API versions, which are currently changing rapidly. See the Version Support table.
     - As long as the "Profile Version" is the same between LASIM versions, it is possible to use different LASIM versions together to target Lemmy servers running different incompatible API versions.
-    - At time of writing there is planned support, but no code written, to support migration from older Profile Versions to newer ones.
+    - Old versions of your LASIM profile are compatible with newer versions of LASIM, but the reverse is not true.
     - If your version is not explicitely listed, take the latest LASIM that is available!
 
 ## Version Support
 | LASIM Version | LASIM Profile Version | Supported Lemmy BE API Version(s) |
 | ------------- | --------------------- | --------------------------------- |
 | 0.1.\*        | 1                     | 0.18.1 (rc.9+), 0.18.2            |
-| 0.2.\*        | 2                     | 0.18.3 and above                  |
+| 0.2.\*        | 2                     | 0.18.3                            |
