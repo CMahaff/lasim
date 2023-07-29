@@ -30,4 +30,4 @@
 | LASIM Version | LASIM Profile Version | Supported Lemmy BE API Version(s) |
 | ------------- | --------------------- | --------------------------------- |
 | 0.1.\*        | 1                     | 0.18.1 (rc.9+), 0.18.2            |
-| 0.2.\*        | 2                     | 0.18.3 (rc.5+) and above          |
+| 0.2.\*        | 2                     | 0.18.3 and above                  |

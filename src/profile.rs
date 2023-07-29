@@ -6,21 +6,21 @@ use crate::lemmy::typecast;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ProfileSettings {
-    show_nsfw: bool,
-    show_scores: bool,
-    theme: String,
-    default_sort_type: String,
-    default_listing_type: String,
-    interface_language: String,
-    show_avatars: bool,
-    send_notifications_to_email: bool,
-    bot_account: bool,
-    show_bot_accounts: bool,
-    show_read_posts: bool,
-    show_new_post_notifs: bool,
-    discussion_languages: Vec<i32>,
-    open_links_in_new_tab: bool,
-    infinite_scroll_enabled: bool,
+    pub show_nsfw: bool,
+    pub show_scores: bool,
+    pub theme: String,
+    pub default_sort_type: String,
+    pub default_listing_type: String,
+    pub interface_language: String,
+    pub show_avatars: bool,
+    pub send_notifications_to_email: bool,
+    pub bot_account: bool,
+    pub show_bot_accounts: bool,
+    pub show_read_posts: bool,
+    pub show_new_post_notifs: bool,
+    pub discussion_languages: Vec<i32>,
+    pub open_links_in_new_tab: bool,
+    pub infinite_scroll_enabled: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
