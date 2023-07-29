@@ -28,29 +28,26 @@ pub struct ProfileConfigurationV1 {
     pub profile_settings: ProfileSettingsV1,
 }
 
-fn read_profile() -> Result<ProfileConfigurationV1, String> {
-    let path = Path::new("profile_v1.json");
+const OLD_PROFILE_FILENAME: &str = "profile_v1.json";
+
+pub fn read_profile() -> Result<ProfileConfigurationV1, String> {
+    let path = Path::new(OLD_PROFILE_FILENAME);
     let profile_json_result = std::fs::read_to_string(path);
     let profile_json = match profile_json_result {
         Ok(file) => file,
-        Err(_) => return Err("ERROR: Failed to open profile settings!".to_string()),
+        Err(_) => return Err(format!("ERROR: Failed to open {}", OLD_PROFILE_FILENAME)),
     };
 
     let profile_local_result: Result<ProfileConfigurationV1, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
     let profile_local = match profile_local_result {
         Ok(profile) => profile,
-        Err(e) => return Err(format!("ERROR: Failed to parse profile JSON - {}", e)),
+        Err(e) => return Err(format!("ERROR: Failed to parse {} JSON - {}", OLD_PROFILE_FILENAME, e)),
     };
 
     return Ok(profile_local);
 }
 
-pub fn convert_profile() -> Result<ProfileConfiguration, String> {
-    let old_profile = match read_profile() {
-        Ok(profile) => profile,
-        Err(e) => return Err(e)
-    };
-
+pub fn convert_profile(old_profile: ProfileConfigurationV1) -> ProfileConfiguration {
     let new_profile = ProfileConfiguration {
         blocked_users: old_profile.blocked_users,
         blocked_communities: old_profile.blocked_communities,
@@ -74,5 +71,5 @@ pub fn convert_profile() -> Result<ProfileConfiguration, String> {
         },
     };
 
-    return Ok(new_profile);
+    return new_profile;
 }

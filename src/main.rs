@@ -18,9 +18,6 @@ use futures::executor::block_on;
 
 slint::include_modules!();
 
-const PROFILE_FILENAME_START: &str = "profile_v";
-const PROFILE_FILENAME_END: &str = ".json";
-const PROFILE_CURRENT_VERSION: &str = "2";
 const PANIC_LOG: &str = "error.log";
 
 struct ProcessingInstruction {
@@ -57,7 +54,7 @@ fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
 }
 
 fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
-    let profile_filename = format!("{}{}{}", PROFILE_FILENAME_START, PROFILE_CURRENT_VERSION, PROFILE_FILENAME_END);
+    let profile_filename = migrations::profile_migrate::get_latest_profile_name();
     let path = Path::new(profile_filename.as_str());
     let mut file = match File::create(&path) {
         Ok(file) => file,
@@ -135,52 +132,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 }
 
 fn read_profile() -> Result<profile::ProfileConfiguration, String> {
-    // Identify latest profile version
-    let mut latest_profile_path: String = "".to_string();
-    let mut latest_profile_version: u16 = 0;
-    let directory_items = std::fs::read_dir("./").unwrap();
-    for item in directory_items {
-        if item.is_ok() {
-            let dir_entry = item.unwrap();
-            let metadata = std::fs::metadata(dir_entry.path());
-            if metadata.is_ok_and(|m| m.is_file()) {
-                let filename = String::from(dir_entry.file_name().to_str().unwrap());
-                if filename.starts_with(PROFILE_FILENAME_START) && filename.ends_with(PROFILE_FILENAME_END) {
-                    let end_index = filename.find(PROFILE_FILENAME_END).unwrap();
-                    let profile_version_string = filename.get(PROFILE_FILENAME_START.char_indices().count()..end_index);
-                    let profile_version = profile_version_string.unwrap().parse::<u16>().unwrap();
-
-                    if profile_version > latest_profile_version {
-                        latest_profile_version = profile_version;
-                        latest_profile_path = dir_entry.path().to_str().unwrap().to_string();
-                    }
-                }
-            }
-        }
-    }
-
-    // TODO: Improve this logic in the future, but for now, we only have these 3 possibilities
-    // TODO: Somehow log what file we read
-    if latest_profile_version == 1 {
-        return migrations::migrate_v1_to_v2::convert_profile();
-    } else if latest_profile_version == 2 {
-        let path = Path::new(latest_profile_path.as_str());
-        let profile_json_result = std::fs::read_to_string(path);
-        let profile_json = match profile_json_result {
-            Ok(file) => file,
-            Err(_) => return Err("ERROR: Failed to open profile settings!".to_string()),
-        };
-
-        let profile_local_result: Result<profile::ProfileConfiguration, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
-        let profile_local = match profile_local_result {
-            Ok(profile) => profile,
-            Err(e) => return Err(format!("ERROR: Failed to parse profile JSON - {}", e)),
-        };
-
-        return Ok(profile_local);
-    } else {
-        return Err("ERROR: Invalid profile version!".to_string());
-    }
+    return migrations::profile_migrate::read_latest_profile();
 }
 
 #[tokio::main]
