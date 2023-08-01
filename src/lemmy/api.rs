@@ -10,18 +10,18 @@ use reqwest::Error;
 use url::Url;
 use crate::profile;
 
-pub struct API {
+pub struct Api {
     client: Client,
     instance: Url,
 }
 
-impl API {
-    pub fn new(instance: Url) -> API {
+impl Api {
+    pub fn new(instance: Url) -> Api {
         let mut client_builder = ClientBuilder::new();
         client_builder = client_builder.user_agent("LASIM - https://github.com/CMahaff/lasim");
         let new_client = client_builder.build().unwrap();
 
-        return API {
+        return Api {
             client: new_client,
             instance,
         }

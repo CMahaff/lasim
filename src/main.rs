@@ -99,7 +99,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     }
     let instance_url = instance_url_result.unwrap();
 
-    let api = lemmy::api::API::new(instance_url);
+    let api = lemmy::api::Api::new(instance_url);
 
     // Login
     logger(format!("Logging in as {}", username));
@@ -168,7 +168,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     }
     let instance_url = instance_url_result.unwrap();
 
-    let api = lemmy::api::API::new(instance_url);
+    let api = lemmy::api::Api::new(instance_url);
 
     // Login
     logger(format!("Logging in as {}", username));
