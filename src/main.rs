@@ -65,7 +65,7 @@ fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl
     };
 
     let json_string = serde_json::to_string_pretty(&profile_local);
-    match file.write_all(format!("{}", json_string.unwrap()).as_bytes()) {
+    match file.write_all(json_string.unwrap().as_bytes()) {
         Ok(_) => {
             logger(format!("Wrote Profile to: {}", path.to_str().unwrap()))
         },
@@ -141,7 +141,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let original_profile = match read_profile() {
         Ok(profile) => profile,
         Err(e) => {
-            logger(format!("{}", e).to_string());
+            logger(e);
             return;
         },
     };
@@ -292,7 +292,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
         logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
     }
 
-    logger(format!("Finished!"));
+    logger("Finished!".to_string());
 }
 
 fn main() {
