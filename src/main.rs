@@ -30,7 +30,7 @@ struct ProcessingInstruction {
 
 fn write_panic_info(info: &String) {
     let path = Path::new(PANIC_LOG);
-    let mut file = match File::create(&path) {
+    let mut file = match File::create(path) {
         Ok(file) => file,
         Err(_) => return
     };
@@ -56,7 +56,7 @@ fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
 fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
     let profile_filename = migrations::profile_migrate::get_latest_profile_name();
     let path = Path::new(profile_filename.as_str());
-    let mut file = match File::create(&path) {
+    let mut file = match File::create(path) {
         Ok(file) => file,
         Err(e) => {
             logger(format!("ERROR: Cannot write file - {}: {}", path.display(), e));
