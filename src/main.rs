@@ -1,4 +1,5 @@
 #![windows_subsystem = "windows"]
+#![allow(clippy::needless_return)]
 
 mod lemmy;
 mod profile;
