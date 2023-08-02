@@ -10,28 +10,28 @@ use reqwest::Error;
 use url::Url;
 use crate::profile;
 
-pub struct API {
+pub struct Api {
     client: Client,
     instance: Url,
 }
 
-impl API {
-    pub fn new(instance: Url) -> API {
+impl Api {
+    pub fn new(instance: Url) -> Api {
         let mut client_builder = ClientBuilder::new();
         client_builder = client_builder.user_agent("LASIM - https://github.com/CMahaff/lasim");
         let new_client = client_builder.build().unwrap();
 
-        return API {
+        return Api {
             client: new_client,
             instance,
         }
     }
 
-    pub async fn login(&self, username: &String, password: &String, two_factor_token: Option<String>) -> Result<String, Error> {
+    pub async fn login(&self, username: &str, password: &str, two_factor_token: Option<String>) -> Result<String, Error> {
         let url = self.instance.join("/api/v3/user/login").unwrap();
         let params = person::Login {
-            username_or_email: Sensitive::new(username.clone()),
-            password: Sensitive::new(password.clone()),
+            username_or_email: Sensitive::new(username.to_string()),
+            password: Sensitive::new(password.to_string()),
             totp_2fa_token: two_factor_token,
         };
     
@@ -55,10 +55,10 @@ impl API {
         }
     }
 
-    pub async fn fetch_profile_settings(&self, jwt_token: &String) -> Result<site::GetSiteResponse, Error> {
+    pub async fn fetch_profile_settings(&self, jwt_token: &str) -> Result<site::GetSiteResponse, Error> {
         let url = self.instance.join("/api/v3/site").unwrap();
         let params = site::GetSite {
-            auth: Some(Sensitive::new(jwt_token.clone())),
+            auth: Some(Sensitive::new(jwt_token.to_string())),
         };
     
         let response: Response = self.client
@@ -81,13 +81,13 @@ impl API {
         }
     }
 
-    pub async fn fetch_community_by_name(&self, jwt_token: &String, name: &String) -> 
+    pub async fn fetch_community_by_name(&self, jwt_token: &str, name: &str) -> 
         Result<community::GetCommunityResponse, Error> {
 
         let url = self.instance.join("/api/v3/community").unwrap();
         let params = community::GetCommunity {
-            name: Some(name.clone()),
-            auth: Some(Sensitive::new(jwt_token.clone())),
+            name: Some(name.to_string()),
+            auth: Some(Sensitive::new(jwt_token.to_string())),
             ..Default::default()
         };
     
@@ -112,14 +112,14 @@ impl API {
     }
 
     pub async fn block_community(&self,
-        jwt_token: &String,
+        jwt_token: &str,
         community_id: newtypes::CommunityId) -> Result<community::BlockCommunityResponse, Error> {
 
         let url = self.instance.join("/api/v3/community/block").unwrap();
         let params = community::BlockCommunity {
             community_id,
             block: true,
-            auth: Sensitive::new(jwt_token.clone()),
+            auth: Sensitive::new(jwt_token.to_string()),
         };
     
         let response: Response = self.client
@@ -143,14 +143,14 @@ impl API {
     }
 
     pub async fn follow_community(&self,
-        jwt_token: &String,
+        jwt_token: &str,
         community_id: newtypes::CommunityId) -> Result<community::CommunityResponse, Error> {
 
         let url = self.instance.join("/api/v3/community/follow").unwrap();
         let params = community::FollowCommunity {
             community_id,
             follow: true,
-            auth: Sensitive::new(jwt_token.clone()),
+            auth: Sensitive::new(jwt_token.to_string()),
         };
     
         let response: Response = self.client
@@ -173,13 +173,13 @@ impl API {
         }
     }
 
-    pub async fn fetch_user_details(&self, jwt_token: &String, name: &String) -> 
+    pub async fn fetch_user_details(&self, jwt_token: &str, name: &str) -> 
         Result<person::GetPersonDetailsResponse, Error> {
 
         let url = self.instance.join("/api/v3/user").unwrap();
         let params = person::GetPersonDetails {
-            username: Some(name.clone()),
-            auth: Some(Sensitive::new(jwt_token.clone())),
+            username: Some(name.to_string()),
+            auth: Some(Sensitive::new(jwt_token.to_string())),
             ..Default::default()
         };
     
@@ -204,14 +204,14 @@ impl API {
     }
 
     pub async fn block_user(&self,
-        jwt_token: &String,
+        jwt_token: &str,
         person_id: newtypes::PersonId) -> Result<person::BlockPersonResponse, Error> {
 
         let url = self.instance.join("/api/v3/user/block").unwrap();
         let params = person::BlockPerson {
             person_id,
             block: true,
-            auth: Sensitive::new(jwt_token.clone()),
+            auth: Sensitive::new(jwt_token.to_string()),
         };
     
         let response: Response = self.client
@@ -235,12 +235,12 @@ impl API {
     }
 
     pub async fn save_user_settings(&self,
-        jwt_token: &String,
+        jwt_token: &str,
         user_settings_local: profile::ProfileSettings) -> Result<person::LoginResponse, Error> {
 
         let url = self.instance.join("/api/v3/user/save_user_settings").unwrap();
         let mut user_settings_api = profile::construct_settings(&user_settings_local);
-        user_settings_api.auth = Sensitive::new(jwt_token.clone());
+        user_settings_api.auth = Sensitive::new(jwt_token.to_string());
     
         let response: Response = self.client
             .put(url)

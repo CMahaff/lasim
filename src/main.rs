@@ -1,4 +1,5 @@
 #![windows_subsystem = "windows"]
+#![allow(clippy::needless_return)]
 
 mod lemmy;
 mod profile;
@@ -30,7 +31,7 @@ struct ProcessingInstruction {
 
 fn write_panic_info(info: &String) {
     let path = Path::new(PANIC_LOG);
-    let mut file = match File::create(&path) {
+    let mut file = match File::create(path) {
         Ok(file) => file,
         Err(_) => return
     };
@@ -56,7 +57,7 @@ fn evaluate_two_factor_token(token: &String) -> Result<Option<String>, &str> {
 fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl FnMut(String)) {
     let profile_filename = migrations::profile_migrate::get_latest_profile_name();
     let path = Path::new(profile_filename.as_str());
-    let mut file = match File::create(&path) {
+    let mut file = match File::create(path) {
         Ok(file) => file,
         Err(e) => {
             logger(format!("ERROR: Cannot write file - {}: {}", path.display(), e));
@@ -65,7 +66,7 @@ fn write_profile(profile_local: &profile::ProfileConfiguration, mut logger: impl
     };
 
     let json_string = serde_json::to_string_pretty(&profile_local);
-    match file.write_all(format!("{}", json_string.unwrap()).as_bytes()) {
+    match file.write_all(json_string.unwrap().as_bytes()) {
         Ok(_) => {
             logger(format!("Wrote Profile to: {}", path.to_str().unwrap()))
         },
@@ -99,7 +100,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     }
     let instance_url = instance_url_result.unwrap();
 
-    let api = lemmy::api::API::new(instance_url);
+    let api = lemmy::api::Api::new(instance_url);
 
     // Login
     logger(format!("Logging in as {}", username));
@@ -141,7 +142,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let original_profile = match read_profile() {
         Ok(profile) => profile,
         Err(e) => {
-            logger(format!("{}", e).to_string());
+            logger(e);
             return;
         },
     };
@@ -168,7 +169,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     }
     let instance_url = instance_url_result.unwrap();
 
-    let api = lemmy::api::API::new(instance_url);
+    let api = lemmy::api::Api::new(instance_url);
 
     // Login
     logger(format!("Logging in as {}", username));
@@ -292,7 +293,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
         logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
     }
 
-    logger(format!("Finished!"));
+    logger("Finished!".to_string());
 }
 
 fn main() {

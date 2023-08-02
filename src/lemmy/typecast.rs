@@ -13,8 +13,8 @@ impl ToAPI {
         return new_languages;
     }
 
-    pub fn cast_sort_type(original_sort: &String) -> lemmy_db_schema::SortType {
-        match original_sort.as_str() {
+    pub fn cast_sort_type(original_sort: &str) -> lemmy_db_schema::SortType {
+        match original_sort {
             "Active" => lemmy_db_schema::SortType::Active,
             "Hot" => lemmy_db_schema::SortType::Hot,
             "New" => lemmy_db_schema::SortType::New,
@@ -36,8 +36,8 @@ impl ToAPI {
         }
     }
 
-    pub fn cast_listing_type(original_type: &String) -> lemmy_db_schema::ListingType {
-        match original_type.as_str() {
+    pub fn cast_listing_type(original_type: &str) -> lemmy_db_schema::ListingType {
+        match original_type {
             "All" =>lemmy_db_schema::ListingType::All,
             "Local" => lemmy_db_schema::ListingType::Local,
             "Subscribed" => lemmy_db_schema::ListingType::Subscribed,
