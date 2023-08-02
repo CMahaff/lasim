@@ -1,5 +1,6 @@
 #![windows_subsystem = "windows"]
 #![allow(clippy::needless_return)]
+#![allow(clippy::redundant_field_names)]
 
 mod lemmy;
 mod profile;
@@ -99,7 +100,7 @@ fn write_global_settings(global_settings: GlobalSettings) {
         None => return,
     };
     let config_path = home_directory.join(CONFIG_FILENAME);
-    let mut file = match File::create(&config_path) {
+    let mut file = match File::create(config_path) {
         Ok(file) => file,
         Err(_) => {
             return 
@@ -107,7 +108,7 @@ fn write_global_settings(global_settings: GlobalSettings) {
     };
 
     let json_string = serde_json::to_string_pretty(&global_settings);
-    file.write_all(format!("{}", json_string.unwrap()).as_bytes()).ok();
+    file.write_all(json_string.unwrap().as_bytes()).ok();
 }
 
 fn write_panic_info(info: &String) {

@@ -85,8 +85,8 @@ pub struct FromAPI {}
 impl FromAPI {
     fn parse_url(actor_id: String) -> String {
         let removed_begin = actor_id.strip_prefix("https://").unwrap_or(&actor_id);
-        let split_url: Vec<&str> = removed_begin.split("/").collect();
-        return format!("{}@{}", split_url.get(2).unwrap(), split_url.get(0).unwrap());
+        let split_url: Vec<&str> = removed_begin.split('/').collect();
+        return format!("{}@{}", split_url.get(2).unwrap(), split_url.first().unwrap());
     }
 
     fn construct_blocked_users(original_profile: &site::GetSiteResponse) -> Vec<String> {
