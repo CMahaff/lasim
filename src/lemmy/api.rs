@@ -114,12 +114,13 @@ impl Api {
 
     pub async fn block_community(&self,
         jwt_token: &str,
-        community_id: newtypes::CommunityId) -> Result<community::BlockCommunityResponse, Error> {
+        community_id: newtypes::CommunityId,
+        block: bool) -> Result<community::BlockCommunityResponse, Error> {
 
         let url = self.instance.join("/api/v3/community/block").unwrap();
         let params = community::BlockCommunity {
             community_id,
-            block: true,
+            block: block,
             auth: Sensitive::new(jwt_token.to_string()),
         };
     
@@ -145,12 +146,13 @@ impl Api {
 
     pub async fn follow_community(&self,
         jwt_token: &str,
-        community_id: newtypes::CommunityId) -> Result<community::CommunityResponse, Error> {
+        community_id: newtypes::CommunityId,
+        follow: bool) -> Result<community::CommunityResponse, Error> {
 
         let url = self.instance.join("/api/v3/community/follow").unwrap();
         let params = community::FollowCommunity {
             community_id,
-            follow: true,
+            follow: follow,
             auth: Sensitive::new(jwt_token.to_string()),
         };
     
@@ -206,12 +208,13 @@ impl Api {
 
     pub async fn block_user(&self,
         jwt_token: &str,
-        person_id: newtypes::PersonId) -> Result<person::BlockPersonResponse, Error> {
+        person_id: newtypes::PersonId,
+        block: bool) -> Result<person::BlockPersonResponse, Error> {
 
         let url = self.instance.join("/api/v3/user/block").unwrap();
         let params = person::BlockPerson {
             person_id,
-            block: true,
+            block: block,
             auth: Sensitive::new(jwt_token.to_string()),
         };
     

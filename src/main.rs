@@ -218,6 +218,125 @@ fn read_profile() -> Result<profile::ProfileConfiguration, String> {
     return migrations::profile_migrate::read_latest_profile();
 }
 
+async fn block_users(api: &lemmy::api::Api,
+    jwt_token: &str,
+    message_rate_limit: std::time::Duration,
+    mut logger: impl FnMut(String),
+    user_list: &Vec<String>,
+    block: bool) {
+
+    let block_text = if block {
+        "block"
+    } else {
+        "unblock"
+    };
+
+    for user in user_list {
+        let user_details_result = api.fetch_user_details(jwt_token, user).await;
+        thread::sleep(message_rate_limit);
+
+        if user_details_result.is_err() {
+            logger(format!("Cannot find user {} to {}, got exception {}",
+                            user,
+                            block_text,
+                            user_details_result.unwrap_err()));
+            continue;
+        }
+
+        let id = user_details_result.unwrap().person_view.person.id;
+        let block_user_result = api.block_user(jwt_token, id, block).await;
+        thread::sleep(message_rate_limit);
+
+        match block_user_result {
+            Ok(response) => {
+                if !response.blocked {
+                    format!("Server refused to {} user {}", block_text, user);
+                }
+            }
+            Err(e) => logger(format!("Got exception {}ing user {}: {}", block_text, user, e)),
+        }
+    }
+}
+
+async fn block_communities(api: &lemmy::api::Api,
+    jwt_token: &str,
+    message_rate_limit: std::time::Duration,
+    mut logger: impl FnMut(String),
+    community_list: &Vec<String>,
+    block: bool) {
+
+    let block_text = if block {
+        "block"
+    } else {
+        "unblock"
+    };
+
+    for community in community_list {
+        let community_details_result = api.fetch_community_by_name(jwt_token, community).await;
+        thread::sleep(message_rate_limit);
+
+        if community_details_result.is_err() {
+            logger(format!("Cannot find community {} to {}, got exception {}",
+                            community,
+                            block_text,
+                            community_details_result.unwrap_err()));
+            continue;
+        }
+        
+        let id = community_details_result.unwrap().community_view.community.id;
+        let block_community_result = api.block_community(jwt_token, id, block).await;
+        thread::sleep(message_rate_limit);
+
+        match block_community_result {
+            Ok(response) => {
+                if !response.blocked {
+                    format!("Server refused to {} community {}", block_text, community);
+                }
+            }
+            Err(e) => logger(format!("Got exception {}ing community {}: {}", block_text, community, e)),
+        }
+    }
+}
+
+async fn follow_communities(api: &lemmy::api::Api,
+    jwt_token: &str,
+    message_rate_limit: std::time::Duration,
+    mut logger: impl FnMut(String),
+    community_list: &Vec<String>,
+    follow: bool) {
+
+    let follow_text = if follow {
+        "follow"
+    } else {
+        "unfollow"
+    };
+
+    for community in community_list {
+        let community_details_result = api.fetch_community_by_name(jwt_token, community).await;
+        thread::sleep(message_rate_limit);
+
+        if community_details_result.is_err() {
+            logger(format!("Cannot find community {}, got exception {}",
+                           community,
+                           community_details_result.unwrap_err()));
+            continue;
+        }
+
+        let id = community_details_result.unwrap().community_view.community.id;
+        let follow_community_result = api.follow_community(jwt_token, id, follow).await;
+        thread::sleep(message_rate_limit);
+
+        match follow_community_result {
+            Ok(response) => {
+                if response.community_view.subscribed == lemmy_api_common::lemmy_db_schema::SubscribedType::NotSubscribed {
+                    format!("Server refused to {} community {}", follow_text, community);
+                }
+            }
+            Err(e) => logger(format!("Got exception {}ing community {}: {}", follow_text, community, e)),
+        }
+    }
+}
+
 #[tokio::main]
 async fn process_upload(processing_instruction: ProcessingInstruction, mut logger: impl FnMut(String)) {
     // Read original profile
@@ -279,103 +398,77 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     let new_profile = FromAPI::construct_profile(&new_profile_api);
 
     // Calculating Differences
+    let global_settings = processing_instruction.global_settings;
     let profile_changes = profile::calculate_changes(&original_profile, &new_profile);
-    logger("All profile settings from the original profile will be applied.".to_string());
-    logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
-    logger(format!("{} users will be unblocked", profile_changes.users_to_unblock.len()));
-    logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
-    logger(format!("{} communities will be unblocked", profile_changes.communities_to_unblock.len()));
-    logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
-    logger(format!("{} communities will be unfollowed", profile_changes.communities_to_unfollow.len()));
+    
+    if global_settings.upload_profile_settings {
+        logger("All profile settings from the original profile will be applied.".to_string());
+    }
+    
+    if global_settings.upload_user_blocks {
+        logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
+        if global_settings.sync_removals {
+            logger(format!("{} users will be unblocked", profile_changes.users_to_unblock.len()));
+        }
+    }
+    
+    if global_settings.upload_community_blocks {
+        logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
+        if global_settings.sync_removals {
+            logger(format!("{} communities will be unblocked", profile_changes.communities_to_unblock.len()));
+        }
+    }
+    
+    if global_settings.upload_community_subs {
+        logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
+        if global_settings.sync_removals {
+            logger(format!("{} communities will be unfollowed", profile_changes.communities_to_unfollow.len()));
+        }
+    }
 
     // Call API to actually apply changes to new account
 
     // Account for Rate Limits - values get mapped as seen here: lemmy/src/api_routes_http.rs
-    let message_per_second = new_profile_api.site_view.local_site_rate_limit.message_per_second;
+    let mut message_per_second = new_profile_api.site_view.local_site_rate_limit.message_per_second;
+    if message_per_second <= 0 {
+        // The spec isn't clear, but I saw some discussion claiming this comes back as "0"
+        // for "unlimited". So we need to set it to something, but I want to keep it low
+        // since small instances are the most likely to have this setting on "unlimited"
+        // and we don't want to overwhelm them.
+        message_per_second = 20;
+    }
     let message_rate_limit = std::time::Duration::from_millis((1000f64 / message_per_second as f64).ceil() as u64);
 
-    // Block Users
-    for blocked_user_string in profile_changes.users_to_block {
-        let user_details_result = api.fetch_user_details(&jwt_token, &blocked_user_string).await;
-        thread::sleep(message_rate_limit);
-
-        if user_details_result.is_err() {
-            logger(format!("Cannot find user {} to block, got exception {}",
-                           blocked_user_string,
-                           user_details_result.unwrap_err()));
-            continue;
-        }
-
-        let id_to_block = user_details_result.unwrap().person_view.person.id;
-        let block_user_result = api.block_user(&jwt_token, id_to_block).await;
-        thread::sleep(message_rate_limit);
-
-        match block_user_result {
-            Ok(response) => {
-                if !response.blocked {
-                    format!("Server refused to block user {}", blocked_user_string);
-                }
-            }
-            Err(e) => logger(format!("Got exception blocking user {}: {}", blocked_user_string, e)),
+    // Block / Unblock Users
+    if global_settings.upload_user_blocks {
+        block_users(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.users_to_block, true).await;
+        if global_settings.sync_removals {
+            block_users(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.users_to_unblock, false).await;
         }
     }
     
     // Block Communities
-    for blocked_community_string in profile_changes.communities_to_block {
-        let community_details_result = api.fetch_community_by_name(&jwt_token, &blocked_community_string).await;
-        thread::sleep(message_rate_limit);
-
-        if community_details_result.is_err() {
-            logger(format!("Cannot find community {} to block, got exception {}",
-                           blocked_community_string,
-                           community_details_result.unwrap_err()));
-            continue;
-        }
-        
-        let id_to_block = community_details_result.unwrap().community_view.community.id;
-        let block_community_result = api.block_community(&jwt_token, id_to_block).await;
-        thread::sleep(message_rate_limit);
-
-        match block_community_result {
-            Ok(response) => {
-                if !response.blocked {
-                    format!("Server refused to block community {}", blocked_community_string);
-                }
-            }
-            Err(e) => logger(format!("Got exception blocking community {}: {}", blocked_community_string, e)),
+    if global_settings.upload_community_blocks {
+        block_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_block, true).await;
+        if global_settings.sync_removals {
+            block_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_unblock, false).await;
         }
     }
     
     // Follow Communities
-    for follow_community_string in profile_changes.communities_to_follow {
-        let community_details_result = api.fetch_community_by_name(&jwt_token, &follow_community_string).await;
-        thread::sleep(message_rate_limit);
-
-        if community_details_result.is_err() {
-            logger(format!("Cannot find community {}, got exception {}",
-                           follow_community_string,
-                           community_details_result.unwrap_err()));
-            continue;
-        }
-
-        let id_to_follow = community_details_result.unwrap().community_view.community.id;
-        let follow_community_result = api.follow_community(&jwt_token, id_to_follow).await;
-        thread::sleep(message_rate_limit);
-
-        match follow_community_result {
-            Ok(response) => {
-                if response.community_view.subscribed == lemmy_api_common::lemmy_db_schema::SubscribedType::NotSubscribed {
-                    format!("Server refused to follow community {}", follow_community_string);
-                }
-            }
-            Err(e) => logger(format!("Got exception following community {}: {}", follow_community_string, e)),
+    if global_settings.upload_community_subs {
+        follow_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_follow, true).await;
+        if global_settings.sync_removals {
+            follow_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_unfollow, false).await;
         }
     }
     
     // Save profile settings
-    let save_settings_result = api.save_user_settings(&jwt_token, profile_changes.profile_settings).await;
-    if save_settings_result.is_err() {
-        logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
+    if global_settings.upload_profile_settings {
+        let save_settings_result = api.save_user_settings(&jwt_token, profile_changes.profile_settings).await;
+        if save_settings_result.is_err() {
+            logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
+        }
     }
 
     logger("Finished!".to_string());
