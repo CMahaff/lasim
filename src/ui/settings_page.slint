@@ -1,0 +1,105 @@
+import { VerticalBox, CheckBox } from "std-widgets.slint";
+
+export global SettingsPageHandler {
+    callback toggled();
+}
+
+export component SettingsPage inherits VerticalLayout {
+    in-out property <bool> upload_profile_settings <=> upload_profile_settings_object.checked;
+    in-out property <bool> upload_community_subs <=> upload_community_subs_object.checked;
+    in-out property <bool> upload_community_blocks <=> upload_community_blocks_object.checked;
+    in-out property <bool> upload_user_blocks <=> upload_user_blocks_object.checked;
+    in-out property <bool> upload_user_saved_posts <=> upload_user_saved_posts_object.checked;
+    in-out property <bool> sync_removals <=> sync_removals_object.checked;
+    in-out property <bool> confirm_uploads <=> confirm_uploads_object.checked;
+    in-out property <bool> write_api_profiles <=> write_api_profiles_object.checked;
+
+    alignment: start;
+    width: 280px;
+    padding-left: 5px;
+
+    VerticalBox {
+        alignment: start;
+        width: 280px;
+        Text {
+            text: "Upload Options";
+            font-size: 14px;
+        }
+        upload_profile_settings_object := CheckBox {
+            text: "Upload Profile Settings";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+        }
+        upload_community_subs_object := CheckBox {
+            text: "Upload Community Subscriptions";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+        }
+        upload_community_blocks_object := CheckBox {
+            text: "Upload Community Blocks";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+        }
+        upload_user_blocks_object := CheckBox {
+            text: "Upload User Blocks";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+        }
+        upload_user_saved_posts_object := CheckBox {
+            text: "Upload Saved Posts - Coming Soon";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+            enabled: false;
+        }
+    }
+
+    VerticalBox {
+        alignment: start;
+        width: 280px;
+        Text {
+            text: "Synchronization Options";
+            font-size: 14px;
+        }
+        sync_removals_object := CheckBox {
+            text: "Sync Removals";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+        }
+        Text {
+            text: "WARNING: Enabling this option means anything not present in the " + 
+                  "downloaded profile will be REMOVED from the accounts uploaded to. " + 
+                  "Use with caution or your data could be lost!";
+            color: red;
+            wrap: word-wrap;
+        }
+    }
+    
+    VerticalBox {
+        alignment: start;
+        width: 280px;
+        Text {
+            text: "Other Options";
+            font-size: 14px;
+        }
+        confirm_uploads_object := CheckBox {
+            text: "Confirm Uploads - Coming Soon";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+            enabled: false;
+        }
+        write_api_profiles_object := CheckBox {
+            text: "Write API Profiles - Coming Soon";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+            enabled: false;
+        }
+    }
+}

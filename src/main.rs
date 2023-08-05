@@ -1,10 +1,12 @@
 #![windows_subsystem = "windows"]
 #![allow(clippy::needless_return)]
+#![allow(clippy::redundant_field_names)]
 
 mod lemmy;
 mod profile;
 mod migrations;
 
+use lemmy::typecast::FromAPI;
 use slint::Weak;
 use slint::SharedString;
 use url::Url;
@@ -19,14 +21,94 @@ use futures::executor::block_on;
 
 slint::include_modules!();
 
+const CONFIG_FILENAME: &str = ".lasim_config.json";
 const PANIC_LOG: &str = "error.log";
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct GlobalSettings {
+    pub upload_profile_settings: bool,
+    pub upload_community_subs: bool,
+    pub upload_community_blocks: bool,
+    pub upload_user_blocks: bool,
+    pub upload_user_saved_posts: bool,
+    pub sync_removals: bool,
+    pub confirm_uploads: bool,
+    pub write_api_profiles: bool,
+}
+
+#[derive(Debug)]
 struct ProcessingInstruction {
     instruction_type: SharedString,
     instance: SharedString,
     username: SharedString,
     password: SharedString,
     two_factor_token: SharedString,
+    global_settings: GlobalSettings,
+}
+
+fn read_global_settings() -> Result<GlobalSettings, String> {
+    let home_directory = match home::home_dir() {
+        Some(home_dir) => home_dir,
+        None => return Err("Cannot identify home directory.".to_string()),
+    };
+    let config_path = home_directory.join(CONFIG_FILENAME);
+    let config_json_result = std::fs::read_to_string(config_path);
+    let config_json = match config_json_result {
+        Ok(file) => file,
+        Err(_) => return Err("Cannot read config file.".to_string()),
+    };
+
+    let config_result: Result<GlobalSettings, serde_json::Error> = serde_json::from_slice(config_json.as_bytes());
+    let config = match config_result {
+        Ok(config) => config,
+        Err(_) => return Err("Cannot convert JSON to object".to_string()),
+    };
+
+    return Ok(config);
+}
+
+fn apply_global_settings(app: Weak<App>) {
+    let global_settings = match read_global_settings() {
+        Ok(config) => config,
+        Err(_) => {
+            GlobalSettings {
+                upload_profile_settings: true,
+                upload_community_subs: true,
+                upload_community_blocks: true,
+                upload_user_blocks: true,
+                upload_user_saved_posts: false,
+                sync_removals: false,
+                confirm_uploads: true,
+                write_api_profiles: false,
+            }
+        },
+    };
+
+    app.unwrap().set_upload_profile_settings(global_settings.upload_profile_settings);
+    app.unwrap().set_upload_community_subs(global_settings.upload_community_subs);
+    app.unwrap().set_upload_community_blocks(global_settings.upload_community_blocks);
+    app.unwrap().set_upload_user_blocks(global_settings.upload_user_blocks);
+    app.unwrap().set_upload_user_saved_posts(global_settings.upload_user_saved_posts);
+    app.unwrap().set_sync_removals(global_settings.sync_removals);
+    app.unwrap().set_confirm_uploads(global_settings.confirm_uploads);
+    app.unwrap().set_write_api_profiles(global_settings.write_api_profiles);
+}
+
+fn write_global_settings(global_settings: GlobalSettings) {
+    let home_directory = match home::home_dir() {
+        Some(home_dir) => home_dir,
+        None => return,
+    };
+    let config_path = home_directory.join(CONFIG_FILENAME);
+    let mut file = match File::create(config_path) {
+        Ok(file) => file,
+        Err(_) => {
+            return 
+        }
+    };
+
+    let json_string = serde_json::to_string_pretty(&global_settings);
+    file.write_all(json_string.unwrap().as_bytes()).ok();
 }
 
 fn write_panic_info(info: &String) {
@@ -125,7 +207,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     logger("Profile retrieved!".to_string());
 
     // Convert Profile
-    let profile_local = profile::construct_profile(&profile_settings);
+    let profile_local = FromAPI::construct_profile(&profile_settings);
 
     // Write to File
     write_profile(&profile_local, logger);
@@ -134,6 +216,125 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 
 fn read_profile() -> Result<profile::ProfileConfiguration, String> {
     return migrations::profile_migrate::read_latest_profile();
+}
+
+async fn block_users(api: &lemmy::api::Api,
+    jwt_token: &str,
+    message_rate_limit: std::time::Duration,
+    mut logger: impl FnMut(String),
+    user_list: &Vec<String>,
+    block: bool) {
+
+    let block_text = if block {
+        "block"
+    } else {
+        "unblock"
+    };
+
+    for user in user_list {
+        let user_details_result = api.fetch_user_details(jwt_token, user).await;
+        thread::sleep(message_rate_limit);
+
+        if user_details_result.is_err() {
+            logger(format!("Cannot find user {} to {}, got exception {}",
+                            user,
+                            block_text,
+                            user_details_result.unwrap_err()));
+            continue;
+        }
+
+        let id = user_details_result.unwrap().person_view.person.id;
+        let block_user_result = api.block_user(jwt_token, id, block).await;
+        thread::sleep(message_rate_limit);
+
+        match block_user_result {
+            Ok(response) => {
+                if !response.blocked {
+                    format!("Server refused to {} user {}", block_text, user);
+                }
+            }
+            Err(e) => logger(format!("Got exception {}ing user {}: {}", block_text, user, e)),
+        }
+    }
+}
+
+async fn block_communities(api: &lemmy::api::Api,
+    jwt_token: &str,
+    message_rate_limit: std::time::Duration,
+    mut logger: impl FnMut(String),
+    community_list: &Vec<String>,
+    block: bool) {
+
+    let block_text = if block {
+        "block"
+    } else {
+        "unblock"
+    };
+
+    for community in community_list {
+        let community_details_result = api.fetch_community_by_name(jwt_token, community).await;
+        thread::sleep(message_rate_limit);
+
+        if community_details_result.is_err() {
+            logger(format!("Cannot find community {} to {}, got exception {}",
+                            community,
+                            block_text,
+                            community_details_result.unwrap_err()));
+            continue;
+        }
+        
+        let id = community_details_result.unwrap().community_view.community.id;
+        let block_community_result = api.block_community(jwt_token, id, block).await;
+        thread::sleep(message_rate_limit);
+
+        match block_community_result {
+            Ok(response) => {
+                if !response.blocked {
+                    format!("Server refused to {} community {}", block_text, community);
+                }
+            }
+            Err(e) => logger(format!("Got exception {}ing community {}: {}", block_text, community, e)),
+        }
+    }
+}
+
+async fn follow_communities(api: &lemmy::api::Api,
+    jwt_token: &str,
+    message_rate_limit: std::time::Duration,
+    mut logger: impl FnMut(String),
+    community_list: &Vec<String>,
+    follow: bool) {
+
+    let follow_text = if follow {
+        "follow"
+    } else {
+        "unfollow"
+    };
+
+    for community in community_list {
+        let community_details_result = api.fetch_community_by_name(jwt_token, community).await;
+        thread::sleep(message_rate_limit);
+
+        if community_details_result.is_err() {
+            logger(format!("Cannot find community {}, got exception {}",
+                           community,
+                           community_details_result.unwrap_err()));
+            continue;
+        }
+
+        let id = community_details_result.unwrap().community_view.community.id;
+        let follow_community_result = api.follow_community(jwt_token, id, follow).await;
+        thread::sleep(message_rate_limit);
+
+        match follow_community_result {
+            Ok(response) => {
+                if response.community_view.subscribed == lemmy_api_common::lemmy_db_schema::SubscribedType::NotSubscribed {
+                    format!("Server refused to {} community {}", follow_text, community);
+                }
+            }
+            Err(e) => logger(format!("Got exception {}ing community {}: {}", follow_text, community, e)),
+        }
+    }
 }
 
 #[tokio::main]
@@ -194,103 +395,102 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     logger("Existing Settings Downloaded. Calculating delta...".to_string());
 
     // Convert
-    let new_profile = profile::construct_profile(&new_profile_api);
+    let new_profile = FromAPI::construct_profile(&new_profile_api);
 
     // Calculating Differences
+    let global_settings = processing_instruction.global_settings;
     let profile_changes = profile::calculate_changes(&original_profile, &new_profile);
-    logger("All profile settings from the original profile will be applied.".to_string());
-    logger(format!("{} new users will be blocked", profile_changes.blocked_users.len()));
-    logger(format!("{} new communities will be blocked", profile_changes.blocked_communities.len()));
-    logger(format!("{} new communities will be followed", profile_changes.followed_communities.len()));
+    let mut api_calls_needed = 0u32;
+    
+    if global_settings.upload_profile_settings {
+        logger("All profile settings from the original profile will be applied.".to_string());
+        api_calls_needed += 1;
+    }
+    
+    if global_settings.upload_user_blocks {
+        logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
+        api_calls_needed += profile_changes.users_to_block.len() as u32 * 2;
+
+        if global_settings.sync_removals {
+            logger(format!("{} users will be unblocked", profile_changes.users_to_unblock.len()));
+            api_calls_needed += profile_changes.users_to_unblock.len() as u32 * 2;
+        }
+    }
+    
+    if global_settings.upload_community_blocks {
+        logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
+        api_calls_needed += profile_changes.communities_to_block.len() as u32 * 2;
+
+        if global_settings.sync_removals {
+            logger(format!("{} communities will be unblocked", profile_changes.communities_to_unblock.len()));
+            api_calls_needed += profile_changes.communities_to_unblock.len() as u32 * 2;
+        }
+    }
+    
+    if global_settings.upload_community_subs {
+        logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
+        api_calls_needed += profile_changes.communities_to_follow.len() as u32 * 2;
+
+        if global_settings.sync_removals {
+            logger(format!("{} communities will be unfollowed", profile_changes.communities_to_unfollow.len()));
+            api_calls_needed += profile_changes.communities_to_unfollow.len() as u32 * 2;
+        }
+    }
 
     // Call API to actually apply changes to new account
 
     // Account for Rate Limits - values get mapped as seen here: lemmy/src/api_routes_http.rs
-    let message_per_second = new_profile_api.site_view.local_site_rate_limit.message_per_second;
-    let message_rate_limit = std::time::Duration::from_millis((1000f64 / message_per_second as f64).ceil() as u64);
+    let mut message_count_per_time_period = new_profile_api.site_view.local_site_rate_limit.message;
+    if message_count_per_time_period <= 0 {
+        message_count_per_time_period = 1;
+    }
+    let mut message_time_period_interval_sec = new_profile_api.site_view.local_site_rate_limit.message_per_second;
+    if message_time_period_interval_sec <= 0 {
+        message_time_period_interval_sec = 1;
+    }
+    let message_per_second = message_time_period_interval_sec as f64 / message_count_per_time_period as f64;
+    let message_rate_limit = std::time::Duration::from_millis((message_per_second * 1000.0).ceil() as u64);
+    let estimated_time_sec = (message_rate_limit.as_millis() as f64 * api_calls_needed as f64 / 1000.0) as u32;
 
-    // Block Users
-    for blocked_user_string in profile_changes.blocked_users {
-        let user_details_result = api.fetch_user_details(&jwt_token, &blocked_user_string).await;
-        thread::sleep(message_rate_limit);
+    if estimated_time_sec > 60 {
+        let minutes = estimated_time_sec / 60;
+        let remaining_seconds = estimated_time_sec % 60;
+        logger(format!("Estimated Upload Time: {}m {}s", minutes, remaining_seconds));
+    } else {
+        logger(format!("Estimated Upload Time: {}s", estimated_time_sec));
+    }
+    
 
-        if user_details_result.is_err() {
-            logger(format!("Cannot find user {} to block, got exception {}",
-                           blocked_user_string,
-                           user_details_result.unwrap_err()));
-            continue;
-        }
-
-        let id_to_block = user_details_result.unwrap().person_view.person.id;
-        let block_user_result = api.block_user(&jwt_token, id_to_block).await;
-        thread::sleep(message_rate_limit);
-
-        match block_user_result {
-            Ok(response) => {
-                if !response.blocked {
-                    format!("Server refused to block user {}", blocked_user_string);
-                }
-            }
-            Err(e) => logger(format!("Got exception blocking user {}: {}", blocked_user_string, e)),
+    // Block / Unblock Users
+    if global_settings.upload_user_blocks {
+        block_users(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.users_to_block, true).await;
+        if global_settings.sync_removals {
+            block_users(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.users_to_unblock, false).await;
         }
     }
     
     // Block Communities
-    for blocked_community_string in profile_changes.blocked_communities {
-        let community_details_result = api.fetch_community_by_name(&jwt_token, &blocked_community_string).await;
-        thread::sleep(message_rate_limit);
-
-        if community_details_result.is_err() {
-            logger(format!("Cannot find community {} to block, got exception {}",
-                           blocked_community_string,
-                           community_details_result.unwrap_err()));
-            continue;
-        }
-        
-        let id_to_block = community_details_result.unwrap().community_view.community.id;
-        let block_community_result = api.block_community(&jwt_token, id_to_block).await;
-        thread::sleep(message_rate_limit);
-
-        match block_community_result {
-            Ok(response) => {
-                if !response.blocked {
-                    format!("Server refused to block community {}", blocked_community_string);
-                }
-            }
-            Err(e) => logger(format!("Got exception blocking community {}: {}", blocked_community_string, e)),
+    if global_settings.upload_community_blocks {
+        block_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_block, true).await;
+        if global_settings.sync_removals {
+            block_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_unblock, false).await;
         }
     }
     
     // Follow Communities
-    for follow_community_string in profile_changes.followed_communities {
-        let community_details_result = api.fetch_community_by_name(&jwt_token, &follow_community_string).await;
-        thread::sleep(message_rate_limit);
-
-        if community_details_result.is_err() {
-            logger(format!("Cannot find community {}, got exception {}",
-                           follow_community_string,
-                           community_details_result.unwrap_err()));
-            continue;
-        }
-
-        let id_to_follow = community_details_result.unwrap().community_view.community.id;
-        let follow_community_result = api.follow_community(&jwt_token, id_to_follow).await;
-        thread::sleep(message_rate_limit);
-
-        match follow_community_result {
-            Ok(response) => {
-                if response.community_view.subscribed == lemmy_api_common::lemmy_db_schema::SubscribedType::NotSubscribed {
-                    format!("Server refused to follow community {}", follow_community_string);
-                }
-            }
-            Err(e) => logger(format!("Got exception following community {}: {}", follow_community_string, e)),
+    if global_settings.upload_community_subs {
+        follow_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_follow, true).await;
+        if global_settings.sync_removals {
+            follow_communities(&api, &jwt_token, message_rate_limit, &mut logger, &profile_changes.communities_to_unfollow, false).await;
         }
     }
     
     // Save profile settings
-    let save_settings_result = api.save_user_settings(&jwt_token, profile_changes.profile_settings).await;
-    if save_settings_result.is_err() {
-        logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
+    if global_settings.upload_profile_settings {
+        let save_settings_result = api.save_user_settings(&jwt_token, profile_changes.profile_settings).await;
+        if save_settings_result.is_err() {
+            logger(format!("Cannot save profile settings, got exception {}", save_settings_result.unwrap_err()));
+        }
     }
 
     logger("Finished!".to_string());
@@ -316,7 +516,9 @@ fn main() {
     // Construct Slint App
     let app = App::new().unwrap();
     let app_weak: Weak<App> = app.as_weak();
-    let app_weak_clone = app_weak.clone();
+    let app_control_page = app_weak.clone();
+    let app_settings_page = app_weak.clone();
+    let app_apply_settings = app_weak.clone();
 
     // Main instruction processing thread
     let main_thread = thread::spawn(move || {
@@ -363,38 +565,72 @@ fn main() {
         }
     });
 
-    // Bind thread action to Click Event
+    // Bind Control Page clicking action
     app.global::<ControlPageHandler>().on_clicked({
-        move |window_type| {            
+        move |window_type| {      
+            let global_settings = GlobalSettings { 
+                upload_profile_settings: app_control_page.unwrap().get_upload_profile_settings(),
+                upload_community_subs: app_control_page.unwrap().get_upload_community_subs(),
+                upload_community_blocks: app_control_page.unwrap().get_upload_community_blocks(),
+                upload_user_blocks: app_control_page.unwrap().get_upload_user_blocks(),
+                upload_user_saved_posts: app_control_page.unwrap().get_upload_user_saved_posts(),
+                sync_removals: app_control_page.unwrap().get_sync_removals(),
+                confirm_uploads: app_control_page.unwrap().get_confirm_uploads(),
+                write_api_profiles: app_control_page.unwrap().get_write_api_profiles(),
+            };
+
             if window_type == "Download" {
-                app_weak_clone.unwrap().set_download_log_output("".into());
-                app_weak_clone.unwrap().set_download_ui_enabled(false);
+                app_control_page.unwrap().set_download_log_output("".into());
+                app_control_page.unwrap().set_download_ui_enabled(false);
 
                 let download_instruction = ProcessingInstruction {
                     instruction_type: window_type,
-                    instance: app_weak_clone.unwrap().get_download_instance_url(),
-                    username: app_weak_clone.unwrap().get_download_username_input(),
-                    password: app_weak_clone.unwrap().get_download_password_input(),
-                    two_factor_token: app_weak_clone.unwrap().get_download_two_factor_input(),
+                    instance: app_control_page.unwrap().get_download_instance_url(),
+                    username: app_control_page.unwrap().get_download_username_input(),
+                    password: app_control_page.unwrap().get_download_password_input(),
+                    two_factor_token: app_control_page.unwrap().get_download_two_factor_input(),
+                    global_settings: global_settings,
                 };
 
                 instruct_tx.send(download_instruction).unwrap();
             } else {
-                app_weak_clone.unwrap().set_upload_log_output("".into());
-                app_weak_clone.unwrap().set_upload_ui_enabled(false);
+                app_control_page.unwrap().set_upload_log_output("".into());
+                app_control_page.unwrap().set_upload_ui_enabled(false);
 
                 let upload_instruction = ProcessingInstruction {
                     instruction_type: window_type,
-                    instance: app_weak_clone.unwrap().get_upload_instance_url(),
-                    username: app_weak_clone.unwrap().get_upload_username_input(),
-                    password: app_weak_clone.unwrap().get_upload_password_input(),
-                    two_factor_token: app_weak_clone.unwrap().get_upload_two_factor_input(),
+                    instance: app_control_page.unwrap().get_upload_instance_url(),
+                    username: app_control_page.unwrap().get_upload_username_input(),
+                    password: app_control_page.unwrap().get_upload_password_input(),
+                    two_factor_token: app_control_page.unwrap().get_upload_two_factor_input(),
+                    global_settings: global_settings,
                 };
 
                 instruct_tx.send(upload_instruction).unwrap();
             }
         }
     });
+
+    // Bind to toggline of settings
+    app.global::<SettingsPageHandler>().on_toggled({
+        move || {
+            let global_settings = GlobalSettings { 
+                upload_profile_settings: app_settings_page.unwrap().get_upload_profile_settings(),
+                upload_community_subs: app_settings_page.unwrap().get_upload_community_subs(),
+                upload_community_blocks: app_settings_page.unwrap().get_upload_community_blocks(),
+                upload_user_blocks: app_settings_page.unwrap().get_upload_user_blocks(),
+                upload_user_saved_posts: app_settings_page.unwrap().get_upload_user_saved_posts(),
+                sync_removals: app_settings_page.unwrap().get_sync_removals(),
+                confirm_uploads: app_settings_page.unwrap().get_confirm_uploads(),
+                write_api_profiles: app_settings_page.unwrap().get_write_api_profiles(),
+            };
+    
+            write_global_settings(global_settings);
+        }
+    });
+
+    // Load Settings
+    apply_global_settings(app_apply_settings);
 
     // Run GUI application
     app.run().unwrap();
@@ -406,6 +642,16 @@ fn main() {
         username: "".into(),
         password: "".into(),
         two_factor_token: "".into(),
+        global_settings: GlobalSettings { 
+            upload_profile_settings: false,
+            upload_community_subs: false,
+            upload_community_blocks: false,
+            upload_user_blocks: false,
+            upload_user_saved_posts: false,
+            sync_removals: false,
+            confirm_uploads: false,
+            write_api_profiles: false,
+        },
     }).unwrap();
     main_thread.join().unwrap();
 }
