@@ -400,44 +400,66 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     // Calculating Differences
     let global_settings = processing_instruction.global_settings;
     let profile_changes = profile::calculate_changes(&original_profile, &new_profile);
+    let mut api_calls_needed = 0u32;
     
     if global_settings.upload_profile_settings {
         logger("All profile settings from the original profile will be applied.".to_string());
+        api_calls_needed += 1;
     }
     
     if global_settings.upload_user_blocks {
         logger(format!("{} new users will be blocked", profile_changes.users_to_block.len()));
+        api_calls_needed += profile_changes.users_to_block.len() as u32 * 2;
+
         if global_settings.sync_removals {
             logger(format!("{} users will be unblocked", profile_changes.users_to_unblock.len()));
+            api_calls_needed += profile_changes.users_to_unblock.len() as u32 * 2;
         }
     }
     
     if global_settings.upload_community_blocks {
         logger(format!("{} new communities will be blocked", profile_changes.communities_to_block.len()));
+        api_calls_needed += profile_changes.communities_to_block.len() as u32 * 2;
+
         if global_settings.sync_removals {
             logger(format!("{} communities will be unblocked", profile_changes.communities_to_unblock.len()));
+            api_calls_needed += profile_changes.communities_to_unblock.len() as u32 * 2;
         }
     }
     
     if global_settings.upload_community_subs {
         logger(format!("{} new communities will be followed", profile_changes.communities_to_follow.len()));
+        api_calls_needed += profile_changes.communities_to_follow.len() as u32 * 2;
+
         if global_settings.sync_removals {
             logger(format!("{} communities will be unfollowed", profile_changes.communities_to_unfollow.len()));
+            api_calls_needed += profile_changes.communities_to_unfollow.len() as u32 * 2;
         }
     }
 
     // Call API to actually apply changes to new account
 
     // Account for Rate Limits - values get mapped as seen here: lemmy/src/api_routes_http.rs
-    let mut message_per_second = new_profile_api.site_view.local_site_rate_limit.message_per_second;
-    if message_per_second <= 0 {
-        // The spec isn't clear, but I saw some discussion claiming this comes back as "0"
-        // for "unlimited". So we need to set it to something, but I want to keep it low
-        // since small instances are the most likely to have this setting on "unlimited"
-        // and we don't want to overwhelm them.
-        message_per_second = 20;
+    let mut message_count_per_time_period = new_profile_api.site_view.local_site_rate_limit.message;
+    if message_count_per_time_period <= 0 {
+        message_count_per_time_period = 1;
     }
-    let message_rate_limit = std::time::Duration::from_millis((1000f64 / message_per_second as f64).ceil() as u64);
+    let mut message_time_period_interval_sec = new_profile_api.site_view.local_site_rate_limit.message_per_second;
+    if message_time_period_interval_sec <= 0 {
+        message_time_period_interval_sec = 1;
+    }
+    let message_per_second = message_time_period_interval_sec as f64 / message_count_per_time_period as f64;
+    let message_rate_limit = std::time::Duration::from_millis((message_per_second * 1000.0).ceil() as u64);
+    let estimated_time_sec = (message_rate_limit.as_millis() as f64 * api_calls_needed as f64 / 1000.0) as u32;
+
+    if estimated_time_sec > 60 {
+        let minutes = estimated_time_sec / 60;
+        let remaining_seconds = estimated_time_sec % 60;
+        logger(format!("Estimated Upload Time: {}m {}s", minutes, remaining_seconds));
+    } else {
+        logger(format!("Estimated Upload Time: {}s", estimated_time_sec));
+    }
+    
 
     // Block / Unblock Users
     if global_settings.upload_user_blocks {
