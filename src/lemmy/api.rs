@@ -17,15 +17,15 @@ pub struct Api {
 }
 
 impl Api {
-    pub fn new(instance: Url) -> Api {
+    pub fn new(instance: Url) -> Result<Api, Error> {
         let mut client_builder = ClientBuilder::new();
         client_builder = client_builder.user_agent("LASIM - https://github.com/CMahaff/lasim");
         let new_client = client_builder.build().unwrap();
 
-        return Api {
+        return Ok(Api {
             client: new_client,
             instance,
-        }
+        })
     }
 
     pub async fn login(&self, username: &str, password: &str, two_factor_token: Option<String>) -> Result<String, Error> {
