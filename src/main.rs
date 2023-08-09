@@ -182,7 +182,7 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     }
     let instance_url = instance_url_result.unwrap();
 
-    let Ok(api) = lemmy::api::Api::new(instance_url) else { 
+    let Ok(api) = lemmy::api::Api::new(instance_url).await else { 
         logger("ERROR: Invalid Instance URL".to_string());
         return
     };
@@ -373,7 +373,7 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
     }
     let instance_url = instance_url_result.unwrap();
 
-    let Ok(api) = lemmy::api::Api::new(instance_url) else { 
+    let Ok(api) = lemmy::api::Api::new(instance_url).await else { 
         logger("ERROR: Invalid Instance URL".to_string());
         return;
     };

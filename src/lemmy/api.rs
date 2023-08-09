@@ -1,4 +1,3 @@
-use futures::executor::block_on;
 use lemmy_api_common::sensitive::Sensitive;
 use lemmy_api_common::person;
 use lemmy_api_common::site;
@@ -18,22 +17,21 @@ pub struct Api {
 }
 
 impl Api {
-    pub fn new(instance: Url) -> Result<Api, Error> {
+    pub async fn new(instance: Url) -> Result<Api, Error> {
         let mut client_builder = ClientBuilder::new();
         client_builder = client_builder.user_agent("LASIM - https://github.com/CMahaff/lasim");
         let new_client = client_builder.build().unwrap();
 
         // Check if instance is an actual Lemmy url by checking getSite
-        block_on(
-            new_client
-                .get(
-                    instance
-                        .join("/api/v3/site")
-                        .expect("Instance url to be a url"),
-                )
-                .send(),
-        )?
-        .error_for_status()?;
+        new_client
+            .get(
+                instance
+                    .join("/api/v3/site")
+                    .expect("Instance url to be a url"),
+            )
+            .send()
+            .await?
+            .error_for_status()?;
 
         return Ok(Api {
             client: new_client,
