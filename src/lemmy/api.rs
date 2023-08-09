@@ -24,11 +24,7 @@ impl Api {
 
         // Check if instance is an actual Lemmy url by checking getSite
         new_client
-            .get(
-                instance
-                    .join("/api/v3/site")
-                    .expect("Instance url to be a url"),
-            )
+            .get(instance.join("/api/v3/site").unwrap())
             .send()
             .await?
             .error_for_status()?;
@@ -36,7 +32,7 @@ impl Api {
         return Ok(Api {
             client: new_client,
             instance,
-        })
+        });
     }
 
     pub async fn login(&self, username: &str, password: &str, two_factor_token: Option<String>) -> Result<String, Error> {
