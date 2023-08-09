@@ -184,9 +184,11 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
 
     let api = match lemmy::api::Api::new(instance_url).await {
         Ok(api) => api,
-        Err(e) => { 
-            logger(format!("ERROR: Invalid Instance URL (or instance is down) - {e}"));
-            return
+        Err(e) => {
+            logger(format!(
+                "ERROR: Invalid Instance URL (or instance is down) - {e}"
+            ));
+            return;
         }
     };
 
@@ -378,9 +380,11 @@ async fn process_upload(processing_instruction: ProcessingInstruction, mut logge
 
     let api = match lemmy::api::Api::new(instance_url).await {
         Ok(api) => api,
-        Err(e) => { 
-            logger(format!("ERROR: Invalid Instance URL (or instance is down) - {e}"));
-            return
+        Err(e) => {
+            logger(format!(
+                "ERROR: Invalid Instance URL (or instance is down) - {e}"
+            ));
+            return;
         }
     };
 
