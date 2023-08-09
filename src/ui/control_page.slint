@@ -14,36 +14,43 @@ export component ControlPage inherits VerticalBox {
     in property <string> log_output;
     in property <bool> ui_enabled: true;
 
-    alignment: start;
+    alignment: stretch;
 
     instance_url_object := LineEdit {
+        vertical-stretch: 0;
         placeholder-text: "Instance URL";
-        width: 250px;
+        min-width: 250px;
         enabled: ui_enabled;
     }
     username_input_object := LineEdit {
+        vertical-stretch: 0;
         placeholder-text: "Username/Email";
-        width: 250px;
+        min-width: 250px;
         enabled: ui_enabled;
     }
     password_input_object := LineEdit {
+        vertical-stretch: 0;
         placeholder-text: "Password";
         input-type: password;
-        width: 250px;
+        min-width: 250px;
         enabled: ui_enabled;
     }
     two_factor_input_object := LineEdit {
+        vertical-stretch: 0;
         placeholder-text: "2FA Token (if enabled)";
-        width: 250px;
+        min-width: 250px;
         enabled: ui_enabled;
     }
 
     HorizontalLayout {
-        alignment: start;
+        vertical-stretch: 1;
+        alignment: stretch;
         VerticalLayout {
-        width: 250px;
+            min-width: 250px;
+            alignment: stretch;
             HorizontalBox {
                 alignment: center;
+                vertical-stretch: 0;
                 Button {
                     text: type;
                     width: 120px;
@@ -53,20 +60,14 @@ export component ControlPage inherits VerticalBox {
                     }
                 }
             }
-            ScrollView {
-                width: 250px;
-                height: 170px;
-                viewport-height: 4000px;
-                viewport-width: 200px;
-                TextEdit {
-                    wrap: word-wrap;
-                    read-only: true;
-                    width: 250px;
-                    x: 0;
-                    y:0;
-                    horizontal-alignment: left;
-                    text: log_output;
-                }
+            TextEdit {
+                vertical-stretch: 1;
+                min-width: 250px;
+                min-height: 170px;
+                wrap: word-wrap;
+                read-only: true;
+                horizontal-alignment: left;
+                text: log_output;
             }
         }
     }
