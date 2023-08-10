@@ -28,8 +28,10 @@ export component App inherits Window {
     in property <bool> write_api_profiles <=> settings_page.write_api_profiles;
 
     title: "LASIM";
-    width: 280px;
-    height: 440px;
+    min-width: 280px;
+    min-height: 440px;
+    preferred-width: 280px;
+    preferred-height: 440px;
 
     VerticalBox {
         alignment: start;
