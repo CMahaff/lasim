@@ -56,4 +56,4 @@ There are currently 5 settings you can toggle to alter the default LASIM experie
 | LASIM Version | LASIM Profile Version | Supported Lemmy BE Version(s) |
 | ------------- | --------------------- | --------------------------------- |
 | 0.1.\*        | 1                     | 0.18.1 (rc.9+), 0.18.2            |
-| 0.2.\*        | 2                     | 0.18.3                            |
+| 0.2.\*        | 2                     | 0.18.3, 0.18.4                    |
