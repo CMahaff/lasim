@@ -516,11 +516,7 @@ fn main() {
     // Setup some kind of logging for if we crash
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
-        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
-            write_panic_info(&format!("Unexpected Error Occurred: {s:?}"));
-        } else {
-            write_panic_info(&"Unknown Error Occurred!".to_string());
-        }
+        write_panic_info(&format!("Unexpected Error Occurred: {}", panic_info));
         panic_hook(panic_info);
         std::process::exit(1);
     }));
