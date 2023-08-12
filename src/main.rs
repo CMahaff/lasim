@@ -214,26 +214,6 @@ async fn process_download(processing_instruction: ProcessingInstruction, mut log
     let profile_settings = profile_settings_result.unwrap();
     logger("Profile retrieved!".to_string());
 
-    // Write raw profile
-    let path = Path::new("raw_profile.json");
-    let mut file = match File::create(path) {
-        Ok(file) => file,
-        Err(e) => {
-            logger(format!("ERROR: Cannot write file - {}: {}", path.display(), e));
-            return
-        }
-    };
-
-    let json_string = serde_json::to_string_pretty(&profile_settings);
-    match file.write_all(json_string.unwrap().as_bytes()) {
-        Ok(_) => {
-            logger(format!("Wrote Raw Profile to: {}", path.to_str().unwrap()))
-        },
-        Err(e) => {
-            logger(format!("ERROR: Cannot write file - {}: {}", path.display(), e));
-        }
-    }
-
     // Convert Profile
     let profile_local = FromAPI::construct_profile(&profile_settings);
 
@@ -536,11 +516,7 @@ fn main() {
     // Setup some kind of logging for if we crash
     let panic_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
-        if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
-            write_panic_info(&format!("Unexpected Error Occurred: {s:?}"));
-        } else {
-            write_panic_info(&"Unknown Error Occurred!".to_string());
-        }
+        write_panic_info(&format!("Unexpected Error Occurred: {}", panic_info));
         panic_hook(panic_info);
         std::process::exit(1);
     }));
