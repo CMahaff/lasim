@@ -21,6 +21,7 @@ export component App inherits Window {
     in property <bool> upload_profile_settings <=> settings_page.upload_profile_settings;
     in property <bool> upload_community_subs <=> settings_page.upload_community_subs;
     in property <bool> upload_community_blocks <=> settings_page.upload_community_blocks;
+    in property <bool> upload_instance_blocks <=> settings_page.upload_instance_blocks;
     in property <bool> upload_user_blocks <=> settings_page.upload_user_blocks;
     in property <bool> upload_user_saved_posts <=> settings_page.upload_user_saved_posts;
     in property <bool> sync_removals <=> settings_page.sync_removals;
@@ -29,9 +30,9 @@ export component App inherits Window {
 
     title: "LASIM";
     min-width: 280px;
-    min-height: 440px;
+    min-height: 450px;
     preferred-width: 280px;
-    preferred-height: 440px;
+    preferred-height: 450px;
 
     VerticalBox {
         alignment: start;

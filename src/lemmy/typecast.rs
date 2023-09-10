@@ -13,6 +13,8 @@ impl ToAPI {
     pub fn construct_settings(profile_settings: &ProfileSettings) -> person::SaveUserSettings {
         return person::SaveUserSettings {
             show_nsfw: Some(profile_settings.show_nsfw),
+            blur_nsfw: Some(profile_settings.blur_nsfw),
+            auto_expand: Some(profile_settings.auto_expand),
             show_scores: Some(profile_settings.show_scores),
             theme: Some(profile_settings.theme.clone()),
             default_sort_type: Some(Self::cast_sort_type(&profile_settings.default_sort_type)),
@@ -66,6 +68,8 @@ impl ToAPI {
             "TopThreeMonths" => lemmy_db_schema::SortType::TopThreeMonths,
             "TopSixMonths" => lemmy_db_schema::SortType::TopSixMonths,
             "TopNineMonths" => lemmy_db_schema::SortType::TopNineMonths,
+            "Controversial" => lemmy_db_schema::SortType::Controversial,
+            "Scaled" => lemmy_db_schema::SortType::Scaled,
             _ => lemmy_db_schema::SortType::TopDay,
         }
     }
@@ -75,6 +79,7 @@ impl ToAPI {
             "All" =>lemmy_db_schema::ListingType::All,
             "Local" => lemmy_db_schema::ListingType::Local,
             "Subscribed" => lemmy_db_schema::ListingType::Subscribed,
+            "ModeratorView" => lemmy_db_schema::ListingType::ModeratorView,
             _ => lemmy_db_schema::ListingType::Subscribed,
         }
     }
@@ -141,8 +146,12 @@ impl FromAPI {
             blocked_users: Self::construct_blocked_users(original_profile),
             blocked_communities: Self::construct_blocked_communities(original_profile),
             followed_communities: Self::construct_followed_communities(original_profile),
+            blocked_instances: vec![], // TODO: Implement
+            saved_posts: vec![], // TODO: Implement
             profile_settings: ProfileSettings {
                 show_nsfw: local_user.show_nsfw,
+                blur_nsfw: local_user.blur_nsfw,
+                auto_expand: local_user.auto_expand,
                 show_scores: local_user.show_scores,
                 theme: local_user.theme.clone(),
                 default_sort_type: Self::cast_sort_type(local_user.default_sort_type).to_string(),
@@ -189,6 +198,8 @@ impl FromAPI {
             lemmy_db_schema::SortType::TopThreeMonths => "TopThreeMonths",
             lemmy_db_schema::SortType::TopSixMonths => "TopSixMonths",
             lemmy_db_schema::SortType::TopNineMonths => "TopNineMonths",
+            lemmy_db_schema::SortType::Controversial => "Controversial",
+            lemmy_db_schema::SortType::Scaled => "Scaled",
         }
     }
 
@@ -197,6 +208,7 @@ impl FromAPI {
             lemmy_db_schema::ListingType::All => "All",
             lemmy_db_schema::ListingType::Local => "Local",
             lemmy_db_schema::ListingType::Subscribed => "Subscribed",
+            lemmy_db_schema::ListingType::ModeratorView => "ModeratorView",
         }
     }
 }

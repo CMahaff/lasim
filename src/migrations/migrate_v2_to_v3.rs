@@ -1,38 +1,43 @@
-use crate::migrations::migrate_v2_to_v3::ProfileConfigurationV2;
-use crate::migrations::migrate_v2_to_v3::ProfileSettingsV2;
+use crate::profile::ProfileConfiguration;
+use crate::profile::ProfileSettings;
 use std::path::Path;
 
-// V1: Initial LASIM profile format
+// V2: Added "infinite_scroll_enabled"
+// To convert to current (V3):
+// - Add "blur_nsfw" and "auto_expand"
+// - Support new "SortType" and "ListingType"
+// - Support instance blocking and saved posts
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ProfileSettingsV1 {
-    show_nsfw: bool,
-    show_scores: bool,
-    theme: String,
-    default_sort_type: String,
-    default_listing_type: String,
-    interface_language: String,
-    show_avatars: bool,
-    send_notifications_to_email: bool,
-    bot_account: bool,
-    show_bot_accounts: bool,
-    show_read_posts: bool,
-    show_new_post_notifs: bool,
-    discussion_languages: Vec<i32>,
-    open_links_in_new_tab: bool,
+pub struct ProfileSettingsV2 {
+    pub show_nsfw: bool,
+    pub show_scores: bool,
+    pub theme: String,
+    pub default_sort_type: String,
+    pub default_listing_type: String,
+    pub interface_language: String,
+    pub show_avatars: bool,
+    pub send_notifications_to_email: bool,
+    pub bot_account: bool,
+    pub show_bot_accounts: bool,
+    pub show_read_posts: bool,
+    pub show_new_post_notifs: bool,
+    pub discussion_languages: Vec<i32>,
+    pub open_links_in_new_tab: bool,
+    pub infinite_scroll_enabled: bool,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-pub struct ProfileConfigurationV1 {
+pub struct ProfileConfigurationV2 {
     pub blocked_users: Vec<String>,
     pub blocked_communities: Vec<String>,
     pub followed_communities: Vec<String>,
-    pub profile_settings: ProfileSettingsV1,
+    pub profile_settings: ProfileSettingsV2,
 }
 
-const OLD_PROFILE_FILENAME: &str = "profile_v1.json";
+const OLD_PROFILE_FILENAME: &str = "profile_v2.json";
 
-pub fn read_profile() -> Result<ProfileConfigurationV1, String> {
+pub fn read_profile() -> Result<ProfileConfigurationV2, String> {
     let path = Path::new(OLD_PROFILE_FILENAME);
     let profile_json_result = std::fs::read_to_string(path);
     let profile_json = match profile_json_result {
@@ -40,7 +45,7 @@ pub fn read_profile() -> Result<ProfileConfigurationV1, String> {
         Err(_) => return Err(format!("ERROR: Failed to open {}", OLD_PROFILE_FILENAME)),
     };
 
-    let profile_local_result: Result<ProfileConfigurationV1, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
+    let profile_local_result: Result<ProfileConfigurationV2, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
     let profile_local = match profile_local_result {
         Ok(profile) => profile,
         Err(e) => return Err(format!("ERROR: Failed to parse {} JSON - {}", OLD_PROFILE_FILENAME, e)),
@@ -49,13 +54,17 @@ pub fn read_profile() -> Result<ProfileConfigurationV1, String> {
     return Ok(profile_local);
 }
 
-pub fn convert_profile(old_profile: ProfileConfigurationV1) -> ProfileConfigurationV2 {
-    let new_profile = ProfileConfigurationV2 {
+pub fn convert_profile(old_profile: ProfileConfigurationV2) -> ProfileConfiguration {
+    let new_profile = ProfileConfiguration {
         blocked_users: old_profile.blocked_users,
         blocked_communities: old_profile.blocked_communities,
         followed_communities: old_profile.followed_communities,
-        profile_settings: ProfileSettingsV2 {
+        blocked_instances: vec![],
+        saved_posts: vec![],
+        profile_settings: ProfileSettings {
             show_nsfw: old_profile.profile_settings.show_nsfw,
+            blur_nsfw: true,
+            auto_expand: false,
             show_scores: old_profile.profile_settings.show_scores,
             theme: old_profile.profile_settings.theme,
             default_sort_type: old_profile.profile_settings.default_sort_type,

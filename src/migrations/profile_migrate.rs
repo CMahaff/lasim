@@ -4,7 +4,7 @@ use std::path::Path;
 
 const PROFILE_FILENAME_START: &str = "profile_v";
 const PROFILE_FILENAME_END: &str = ".json";
-const PROFILE_CURRENT_VERSION: u16 = 2;
+const PROFILE_CURRENT_VERSION: u16 = 3;
 
 pub fn read_latest_profile() -> Result<profile::ProfileConfiguration, String> {
     // Identify latest profile version
@@ -27,41 +27,49 @@ pub fn read_latest_profile() -> Result<profile::ProfileConfiguration, String> {
     }
 
     // Convert as necessary
-    let mut profile_v1: Option<migrations::migrate_v1_to_v2::ProfileConfigurationV1> = None;
-    let mut profile_v2: Option<profile::ProfileConfiguration> = None;
+    let profile_v3: Option<profile::ProfileConfiguration>;
 
     if latest_profile_version == 1 {
         let read_result = migrations::migrate_v1_to_v2::read_profile();
-        profile_v1 = match read_result {
+        let profile_v1 = match read_result {
             Ok(profile) => Some(profile),
             Err(e) => return Err(e),
         };
-        latest_profile_version = 2;
+
+        let profile_v2 = migrations::migrate_v1_to_v2::convert_profile(profile_v1.unwrap());
+        profile_v3 = Some(migrations::migrate_v2_to_v3::convert_profile(profile_v2));
+
+    } else if latest_profile_version == 2 {
+        let read_result = migrations::migrate_v2_to_v3::read_profile();
+        let profile_v2 = match read_result {
+            Ok(profile) => Some(profile),
+            Err(e) => return Err(e),
+        };
+
+        profile_v3 = Some(migrations::migrate_v2_to_v3::convert_profile(profile_v2.unwrap()));
+
+    } else if latest_profile_version == PROFILE_CURRENT_VERSION {
+        let filename = format!("profile_v{}.json", PROFILE_CURRENT_VERSION);
+        let path = Path::new(filename.as_str());
+        let profile_json_result = std::fs::read_to_string(path);
+        let profile_json = match profile_json_result {
+            Ok(file) => file,
+            Err(_) => return Err(format!("ERROR: Failed to open {}", filename)),
+        };
+
+        let profile_local_result: Result<profile::ProfileConfiguration, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
+        let profile_local = match profile_local_result {
+            Ok(profile) => profile,
+            Err(e) => return Err(format!("ERROR: Failed to parse {} JSON - {}", filename, e)),
+        };
+
+        profile_v3 = Some(profile_local);
+
+    } else {
+        return Err(format!("ERROR: Invalid LASIM profile version {}", latest_profile_version));
     }
 
-    if latest_profile_version == PROFILE_CURRENT_VERSION {
-        if let Some(profile_v1) = profile_v1 {
-            profile_v2 = Some(migrations::migrate_v1_to_v2::convert_profile(profile_v1));
-        } else {
-            let filename = format!("profile_v{}.json", PROFILE_CURRENT_VERSION);
-            let path = Path::new(filename.as_str());
-            let profile_json_result = std::fs::read_to_string(path);
-            let profile_json = match profile_json_result {
-                Ok(file) => file,
-                Err(_) => return Err(format!("ERROR: Failed to open {}", filename)),
-            };
-
-            let profile_local_result: Result<profile::ProfileConfiguration, serde_json::Error> = serde_json::from_slice(profile_json.as_bytes());
-            let profile_local = match profile_local_result {
-                Ok(profile) => profile,
-                Err(e) => return Err(format!("ERROR: Failed to parse {} JSON - {}", filename, e)),
-            };
-
-            profile_v2 = Some(profile_local);
-        }
-    }
-
-    return profile_v2.ok_or_else(|| "ERROR: No saved profiles found. Use download option first!".to_string());
+    return profile_v3.ok_or_else(|| "ERROR: No saved profiles found. Use download option first!".to_string());
 }
 
 pub fn get_latest_profile_name() -> String {

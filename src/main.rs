@@ -29,6 +29,7 @@ struct GlobalSettings {
     pub upload_profile_settings: bool,
     pub upload_community_subs: bool,
     pub upload_community_blocks: bool,
+    pub upload_instance_blocks: Option<bool>,
     pub upload_user_blocks: bool,
     pub upload_user_saved_posts: bool,
     pub sync_removals: bool,
@@ -68,13 +69,14 @@ fn read_global_settings() -> Result<GlobalSettings, String> {
 }
 
 fn apply_global_settings(app: Weak<App>) {
-    let global_settings = match read_global_settings() {
+    let mut global_settings = match read_global_settings() {
         Ok(config) => config,
         Err(_) => {
             GlobalSettings {
                 upload_profile_settings: true,
                 upload_community_subs: true,
                 upload_community_blocks: true,
+                upload_instance_blocks: Some(true),
                 upload_user_blocks: true,
                 upload_user_saved_posts: false,
                 sync_removals: false,
@@ -84,9 +86,14 @@ fn apply_global_settings(app: Weak<App>) {
         },
     };
 
+    if global_settings.upload_instance_blocks.is_none() { // Added in 0.3.0
+        global_settings.upload_instance_blocks = Some(true);
+    }
+
     app.unwrap().set_upload_profile_settings(global_settings.upload_profile_settings);
     app.unwrap().set_upload_community_subs(global_settings.upload_community_subs);
     app.unwrap().set_upload_community_blocks(global_settings.upload_community_blocks);
+    app.unwrap().set_upload_instance_blocks(global_settings.upload_instance_blocks.unwrap());
     app.unwrap().set_upload_user_blocks(global_settings.upload_user_blocks);
     app.unwrap().set_upload_user_saved_posts(global_settings.upload_user_saved_posts);
     app.unwrap().set_sync_removals(global_settings.sync_removals);
@@ -584,6 +591,7 @@ fn main() {
                 upload_profile_settings: app_control_page.unwrap().get_upload_profile_settings(),
                 upload_community_subs: app_control_page.unwrap().get_upload_community_subs(),
                 upload_community_blocks: app_control_page.unwrap().get_upload_community_blocks(),
+                upload_instance_blocks: Some(app_control_page.unwrap().get_upload_instance_blocks()),
                 upload_user_blocks: app_control_page.unwrap().get_upload_user_blocks(),
                 upload_user_saved_posts: app_control_page.unwrap().get_upload_user_saved_posts(),
                 sync_removals: app_control_page.unwrap().get_sync_removals(),
@@ -630,6 +638,7 @@ fn main() {
                 upload_profile_settings: app_settings_page.unwrap().get_upload_profile_settings(),
                 upload_community_subs: app_settings_page.unwrap().get_upload_community_subs(),
                 upload_community_blocks: app_settings_page.unwrap().get_upload_community_blocks(),
+                upload_instance_blocks: Some(app_settings_page.unwrap().get_upload_instance_blocks()),
                 upload_user_blocks: app_settings_page.unwrap().get_upload_user_blocks(),
                 upload_user_saved_posts: app_settings_page.unwrap().get_upload_user_saved_posts(),
                 sync_removals: app_settings_page.unwrap().get_sync_removals(),
@@ -658,6 +667,7 @@ fn main() {
             upload_profile_settings: false,
             upload_community_subs: false,
             upload_community_blocks: false,
+            upload_instance_blocks: Some(false),
             upload_user_blocks: false,
             upload_user_saved_posts: false,
             sync_removals: false,

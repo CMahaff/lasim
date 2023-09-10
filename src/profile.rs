@@ -1,6 +1,8 @@
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct ProfileSettings {
     pub show_nsfw: bool,
+    pub blur_nsfw: bool,
+    pub auto_expand: bool,
     pub show_scores: bool,
     pub theme: String,
     pub default_sort_type: String,
@@ -22,6 +24,8 @@ pub struct ProfileConfiguration {
     pub blocked_users: Vec<String>,
     pub blocked_communities: Vec<String>,
     pub followed_communities: Vec<String>,
+    pub blocked_instances: Vec<String>,
+    pub saved_posts: Vec<String>,
     pub profile_settings: ProfileSettings,
 }
 
@@ -33,6 +37,10 @@ pub struct ProfileChanges {
     pub communities_to_unblock: Vec<String>,
     pub communities_to_follow: Vec<String>,
     pub communities_to_unfollow: Vec<String>,
+    pub instances_to_block: Vec<String>,
+    pub instances_to_unblock: Vec<String>,
+    pub posts_to_save: Vec<String>,
+    pub posts_to_unsave: Vec<String>,
     pub profile_settings: ProfileSettings,
 }
 
@@ -110,6 +118,10 @@ pub fn calculate_changes(original_profile: &ProfileConfiguration, new_profile: &
         communities_to_unblock: calculate_communities_to_block(new_profile, original_profile),
         communities_to_follow: calculate_communities_to_follow(original_profile, new_profile),
         communities_to_unfollow: calculate_communities_to_follow(new_profile, original_profile),
+        instances_to_block: vec![], // TODO: Implement
+        instances_to_unblock: vec![], // TODO: Implement
+        posts_to_save: vec![], // TODO: Implement
+        posts_to_unsave: vec![], // TODO: Implement
         profile_settings: original_profile.profile_settings.clone(),
     };
 }

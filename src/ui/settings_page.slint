@@ -8,6 +8,7 @@ export component SettingsPage inherits VerticalLayout {
     in-out property <bool> upload_profile_settings <=> upload_profile_settings_object.checked;
     in-out property <bool> upload_community_subs <=> upload_community_subs_object.checked;
     in-out property <bool> upload_community_blocks <=> upload_community_blocks_object.checked;
+    in-out property <bool> upload_instance_blocks <=> upload_instance_blocks_object.checked;
     in-out property <bool> upload_user_blocks <=> upload_user_blocks_object.checked;
     in-out property <bool> upload_user_saved_posts <=> upload_user_saved_posts_object.checked;
     in-out property <bool> sync_removals <=> sync_removals_object.checked;
@@ -43,6 +44,12 @@ export component SettingsPage inherits VerticalLayout {
                 SettingsPageHandler.toggled();
             }
         }
+        upload_instance_blocks_object := CheckBox {
+            text: "Upload Instance Blocks";
+            toggled => {
+                SettingsPageHandler.toggled();
+            }
+        }
         upload_user_blocks_object := CheckBox {
             text: "Upload User Blocks";
             toggled => {
@@ -50,11 +57,10 @@ export component SettingsPage inherits VerticalLayout {
             }
         }
         upload_user_saved_posts_object := CheckBox {
-            text: "Upload Saved Posts - Coming Soon";
+            text: "Upload Saved Posts";
             toggled => {
                 SettingsPageHandler.toggled();
             }
-            enabled: false;
         }
     }
 
