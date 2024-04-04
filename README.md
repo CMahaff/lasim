@@ -1,5 +1,17 @@
 # Lemmy Account Settings Instance Migrator
 
+## Project Inactive
+
+Long overdue, but officially posting here that this project is inactive.
+
+Lemmy 0.19 introduced the option to export / import all user settings, follows, blocks, etc. so this work-around is no longer needed.
+
+Thank you for those of you that contributed, and I hoped the project helped some users in the early Lemmy days when there was a lot of instance hopping. It was exciting to work on something useful, even though my rust is still quite poor.
+
+The original README content is below.
+
+---
+
 ![LASIM Screenshot](LASIM.PNG)
 
 ## How it works
